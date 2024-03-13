@@ -1,1 +1,1 @@
-export type $TSFixMe = any;
+export type $TSFixMe = unknown;

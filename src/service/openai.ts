@@ -35,7 +35,7 @@ export const connectOpenAI = async () => {
 
 export const agent = async (
   openai: OpenAI,
-  userInput: string
+  userInput: string,
 ): Promise<AgentResponse> => {
   messages.push({ role: "user", content: `${userInput}` });
   const response = await openai.chat.completions.create({
@@ -48,7 +48,7 @@ export const agent = async (
   const assistantPrompt = response.choices[0].message?.content;
   messages.push({ role: "assistant", content: assistantPrompt });
   const GPT_RESPONSE = JSON.parse(
-    assistantPrompt || `${FALLBACK_RESPONSE}`
+    assistantPrompt || `${FALLBACK_RESPONSE}`,
   ) as AgentResponse;
   return GPT_RESPONSE;
 };
