@@ -17,7 +17,7 @@ app.use(cors());
 app.use(express.urlencoded({ extended: false }));
 
 app.get("/", (_, res) =>
-  res.type("text").send("Hello World 👋, from Caller Assistant!!")
+  res.type("text").send("Hello World 👋, from Caller Assistant!!"),
 );
 
 app.get("/makeacall", async (req, res) => {
@@ -71,7 +71,7 @@ app.post("/call-update", (req, res) => {
     "Call Status Update:",
     req.body.CallStatus,
     "for Call SID:",
-    req.body.CallSid
+    req.body.CallSid,
   );
   return res.status(200).send();
 });
