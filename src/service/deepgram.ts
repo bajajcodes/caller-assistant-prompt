@@ -3,7 +3,7 @@ import { createClient } from "@deepgram/sdk";
 import { $TSFixMe } from "types/common";
 import { DEEPGRAM_API_KEY } from "../utils/config";
 
-export const connectDeepgram = async () => {
+export const connectDeepgram = () => {
   try {
     if (!DEEPGRAM_API_KEY) {
       throw Error("Deepgram API Key is Missing");

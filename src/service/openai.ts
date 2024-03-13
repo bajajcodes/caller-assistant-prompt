@@ -7,16 +7,17 @@ import type { $TSFixMe } from "../types/common";
 import { OPEN_AI_KEY } from "../utils/config";
 import { systemPrompt } from "../utils/data";
 
-export interface AgentResponse {
+export interface AssistantResponse {
   responseType: ResponseType;
   content: string;
 }
 
+//TODO: intiailize or flush messages on call disconnect
 const messages: Array<ChatCompletionMessageParam> = [
   { role: "system", content: systemPrompt },
 ];
 
-const FALLBACK_RESPONSE: AgentResponse = {
+const FALLBACK_RESPONSE: AssistantResponse = {
   responseType: ResponseType.SAY_FOR_VOICE,
   content: "",
 };
@@ -36,7 +37,7 @@ export const connectOpenAI = async () => {
 export const agent = async (
   openai: OpenAI,
   userInput: string,
-): Promise<AgentResponse> => {
+): Promise<AssistantResponse> => {
   messages.push({ role: "user", content: `${userInput}` });
   const response = await openai.chat.completions.create({
     messages,
@@ -49,6 +50,6 @@ export const agent = async (
   messages.push({ role: "assistant", content: assistantPrompt });
   const GPT_RESPONSE = JSON.parse(
     assistantPrompt || `${FALLBACK_RESPONSE}`,
-  ) as AgentResponse;
+  ) as AssistantResponse;
   return GPT_RESPONSE;
 };
