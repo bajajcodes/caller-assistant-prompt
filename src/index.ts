@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-require("dotenv").config();
+import * as config from "./utils/config";
 
-console.log("Is Compliling");
+console.log("Is Compliling", { config });
