@@ -3,6 +3,8 @@ import EventEmitter from "events";
 import { createServer } from "http";
 import { connectDeepgram } from "service/deepgram";
 import { AssistantResponse, agent, connectOpenAI } from "service/openai";
+import { connectRedis } from "service/redis";
+import { connectTwilio } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
@@ -42,7 +44,7 @@ const startServer = async () => {
             const assitantResponse = await agent(openaiClient, userInput);
             assistantMessages.push(assitantResponse);
             messageQueue.emit("new_message");
-          },
+          }
         );
 
         deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
@@ -99,7 +101,7 @@ const startProcessingAssistantMessages = async () => {
         if (!message) return;
       } else {
         await new Promise((resolve) =>
-          messageQueue.once("new_message", resolve),
+          messageQueue.once("new_message", resolve)
         );
       }
     }
@@ -108,5 +110,7 @@ const startProcessingAssistantMessages = async () => {
   }
 };
 
+connectTwilio();
+connectRedis();
 startServer();
 startProcessingAssistantMessages();

@@ -1,13 +1,13 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
+import { redisClient } from "service/redis";
+import { twilioClient } from "service/twilio";
 import twillio from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
+import { STORE_KEYS } from "types/redis";
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const client = new twillio.Twilio(accountSid, authToken);
 const VoiceResponse = twillio.twiml.VoiceResponse;
 
 const app: Express = express();
@@ -17,7 +17,7 @@ app.use(cors());
 app.use(express.urlencoded({ extended: false }));
 
 app.get("/", (_, res) =>
-  res.type("text").send("Hello World 👋, from Caller Assistant!!"),
+  res.type("text").send("Hello World 👋, from Caller Assistant!!")
 );
 
 app.get("/makeacall", async (req, res) => {
@@ -34,7 +34,7 @@ app.get("/makeacall", async (req, res) => {
     });
     console.info(req.headers.host);
     const twiml = response.toString();
-    const call = await client.calls.create({
+    const call = await twilioClient.calls.create({
       twiml: twiml,
       to: "8883496558",
       from: "+16572145787",
@@ -43,6 +43,7 @@ app.get("/makeacall", async (req, res) => {
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
       record: true,
     });
+    redisClient.set(STORE_KEYS.CALL_SID, call.sid);
     res.send(`Call initiated with SID: ${call.sid}`);
   } catch (err: $TSFixMe) {
     res.status(400).send(err?.message || "Failed to create call");
@@ -51,6 +52,7 @@ app.get("/makeacall", async (req, res) => {
 
 app.post("/recieveacall", async (req, res) => {
   const callSid = req.body?.CallSid;
+  redisClient.set(STORE_KEYS.CALL_SID, callSid);
   console.info({ callSid });
   console.info(req.headers.host);
   const response = new VoiceResponse();
@@ -69,7 +71,7 @@ app.post("/call-update", (req, res) => {
     "Call Status Update:",
     req.body.CallStatus,
     "for Call SID:",
-    req.body.CallSid,
+    req.body.CallSid
   );
   return res.status(200).send();
 });
