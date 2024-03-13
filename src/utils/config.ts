@@ -8,8 +8,10 @@ const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
 const PORT = process.env.PORT;
 const REDIS_CLIENT_URL = process.env.REDIS_CLIENT_URL;
+const CALL_TO_NUMBER = process.env.CALL_TO_NUMBER;
 
 export {
+  CALL_TO_NUMBER,
   DEEPGRAM_API_KEY,
   OPEN_AI_KEY,
   PORT,
