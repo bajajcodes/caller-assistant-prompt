@@ -1,3 +1,10 @@
-import * as config from "./utils/config";
+import { connectOpenAI } from "service/openai";
 
-console.log("Is Compliling", { config });
+connectOpenAI()
+  .then((client) => {
+    console.log(`Connected To openAI`);
+    return client;
+  })
+  .catch(() => {
+    console.error(`Failed To Connect To openAI`);
+  });
