@@ -3,7 +3,7 @@ import twillio, { Twilio } from "twilio";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { STORE_KEYS } from "types/redis";
-import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "../utils/config";
+import { PORT, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "../utils/config";
 import { AssistantResponse } from "./openai";
 import { redisClient } from "./redis";
 
@@ -49,6 +49,10 @@ const updateInProgessCall = async ({
   responseType,
 }: AssistantResponse) => {
   try {
+    const callSid = await getCallSid();
+    if (!callSid) {
+      throw Error(`Cannot Update Call, CallSid: ${callSid} Doesn't Exists.`);
+    }
     if (responseType === ResponseType.END_CALL) {
       return await hangupCall();
     }
@@ -57,24 +61,26 @@ const updateInProgessCall = async ({
       response.say(content);
     }
     if (responseType === ResponseType.SEND_DIGITS) {
+      const digits = content
+        .split("")
+        .map((digit) => `w${digit}`)
+        .join("");
       response.play({
-        digits: `ww${content}`,
+        digits,
       });
     }
     const connect = response.connect();
-    //TODO: replace host here
+    const host = await redisClient.get(STORE_KEYS.HOST);
+    console.info({ host, PORT });
     connect.stream({
-      url: "wss://localhost:3000",
+      url: `wss://${host}`,
       track: "inbound_track",
     });
     response.pause({
-      length: 60,
+      length: 120,
     });
     const twiml = response.toString();
-    const callSid = await getCallSid();
-    if (!callSid) {
-      throw Error(`Cannot Update Call, CallSid: ${callSid} Doesn't Exists.`);
-    }
+    console.info({ twiml, callSid });
     return await twilioClient.calls(callSid).update({
       twiml,
     });

@@ -4,7 +4,7 @@ import { createServer } from "http";
 import { connectDeepgram } from "service/deepgram";
 import { AssistantResponse, agent, connectOpenAI } from "service/openai";
 import { connectRedis } from "service/redis";
-import { connectTwilio } from "service/twilio";
+import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
@@ -29,6 +29,7 @@ const startServer = async () => {
           LiveTranscriptionEvents.Transcript,
           async (transcription) => {
             const transcript = transcription.channel.alternatives[0].transcript;
+            console.info({ transcript });
 
             if (transcript) {
               transcriptCollection.push(transcript);
@@ -98,7 +99,7 @@ const startProcessingAssistantMessages = async () => {
       if (assistantMessages.length > 0) {
         const message = assistantMessages.shift();
         console.info({ message });
-        if (!message) return;
+        await updateInProgessCall(message!);
       } else {
         await new Promise((resolve) =>
           messageQueue.once("new_message", resolve),

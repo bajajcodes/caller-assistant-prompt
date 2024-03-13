@@ -18,8 +18,11 @@ app.use(cors());
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, _, next) => {
+  //TODO: check if it is better to use from env variables
+  redisClient.set(STORE_KEYS.HOST, req.headers.host!);
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
-  const wsProtocol = protocol === "https" ? "wss" : "ws";
+  // const wsProtocol = protocol === "https" ? "wss" : "ws";
+  const wsProtocol = "wss";
   req.headers.protocol = protocol;
   req.headers.wsProtocol = wsProtocol;
   console.info({ protocol, wsProtocol, host: req.headers.host });
@@ -27,7 +30,7 @@ app.use((req, _, next) => {
 });
 
 app.get("/", (_, res) =>
-  res.type("text").send("Hello World 👋, from Caller Assistant!!")
+  res.type("text").send("Hello World 👋, from Caller Assistant!!"),
 );
 
 app.get("/makeacall", async (req, res) => {
@@ -47,7 +50,7 @@ app.get("/makeacall", async (req, res) => {
     response.pause({
       length: 120,
     });
-    console.info(req.headers.host);
+    console.info({ host: req.headers.host });
     const twiml = response.toString();
     const call = await twilioClient.calls.create({
       twiml: twiml,
@@ -87,7 +90,7 @@ app.post("/call-update", (req, res) => {
     "Call Status Update:",
     req.body.CallStatus,
     "for Call SID:",
-    req.body.CallSid
+    req.body.CallSid,
   );
   return res.status(200).send();
 });
