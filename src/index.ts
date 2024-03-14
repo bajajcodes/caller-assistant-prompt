@@ -3,9 +3,11 @@ import EventEmitter from "events";
 import { createServer } from "http";
 import { connectDeepgram } from "service/deepgram";
 import { AssistantResponse, agent, connectOpenAI } from "service/openai";
-import { connectRedis } from "service/redis";
+import { connectRedis, redisClient } from "service/redis";
 import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
+import { ResponseType } from "types/openai";
+import { STORE_KEYS } from "types/redis";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
@@ -45,7 +47,7 @@ const startServer = async () => {
             const assitantResponse = await agent(openaiClient, userInput);
             assistantMessages.push(assitantResponse);
             messageQueue.emit("new_message");
-          },
+          }
         );
 
         deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
@@ -97,12 +99,22 @@ const startProcessingAssistantMessages = async () => {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       if (assistantMessages.length > 0) {
+        const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
         const message = assistantMessages.shift();
-        console.info({ message });
+        console.info({ message, callStatus });
+        if (callStatus !== "in-progress") {
+          const applicationStatus =
+            message?.responseType === ResponseType.END_CALL
+              ? message.applicationStatus
+              : "NA";
+          redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus);
+          console.info("Call is not in-progess cannot update call.");
+          return;
+        }
         await updateInProgessCall(message!);
       } else {
         await new Promise((resolve) =>
-          messageQueue.once("new_message", resolve),
+          messageQueue.once("new_message", resolve)
         );
       }
     }
