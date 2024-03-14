@@ -3,8 +3,8 @@ import twillio, { Twilio } from "twilio";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { STORE_KEYS } from "types/redis";
-import { PORT, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "../utils/config";
-import { AssistantResponse } from "./openai";
+import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "../utils/config";
+import { AssistantResponse, EndCallResponse } from "./openai";
 import { redisClient } from "./redis";
 
 let twilioClient: Twilio;
@@ -19,7 +19,7 @@ const connectTwilio = () => {
       throw Error("Twillio Auth Token is Missing");
     }
     twilioClient = new twillio.Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-    console.info("Twilio Account connected");
+    console.info("Connected to Twilio Client");
   } catch (err: $TSFixMe) {
     const message = err?.message || "Failed to Update Call";
     throw Error(message);
@@ -28,15 +28,19 @@ const connectTwilio = () => {
 
 const getCallSid = async () => await redisClient.get(STORE_KEYS.CALL_SID);
 
-const hangupCall = async () => {
+const hangupCall = async (message: EndCallResponse) => {
   try {
     const callSid = await getCallSid();
     if (!callSid) {
       console.info(
-        `Cannot hangup call, Because CallSid: ${callSid} does not exists.`,
+        `Cannot hangup call, Because CallSid: ${callSid} does not exists.`
       );
       return;
     }
+    await redisClient.set(
+      STORE_KEYS.APPLICATION_STATUS,
+      message.applicationStatus
+    );
     console.info("Hangup Call.");
     return await twilioClient.calls(callSid).update({ status: "completed" });
   } catch (err: $TSFixMe) {
@@ -45,18 +49,17 @@ const hangupCall = async () => {
   }
 };
 
-const updateInProgessCall = async ({
-  content,
-  responseType,
-}: AssistantResponse) => {
+const updateInProgessCall = async (message: AssistantResponse) => {
   try {
+    const { responseType, content } = message;
     const callSid = await getCallSid();
     if (!callSid) {
       throw Error(`Cannot Update Call, CallSid: ${callSid} Doesn't Exists.`);
     }
     if (responseType === ResponseType.END_CALL) {
-      return await hangupCall();
+      return await hangupCall(message as EndCallResponse);
     }
+    const host = await redisClient.get(STORE_KEYS.HOST);
     const response = new VoiceResponse();
     if (responseType === ResponseType.SAY_FOR_VOICE) {
       response.say(content);
@@ -71,8 +74,6 @@ const updateInProgessCall = async ({
       });
     }
     const connect = response.connect();
-    const host = await redisClient.get(STORE_KEYS.HOST);
-    console.info({ host, PORT });
     connect.stream({
       url: `wss://${host}`,
       track: "inbound_track",
@@ -81,7 +82,7 @@ const updateInProgessCall = async ({
       length: 120,
     });
     const twiml = response.toString();
-    console.info({ twiml, callSid });
+    console.info({ twiml });
     return await twilioClient.calls(callSid).update({
       twiml,
     });

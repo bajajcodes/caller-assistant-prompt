@@ -1,13 +1,11 @@
 import { LiveTranscriptionEvents } from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
-import { connectDeepgram } from "service/deepgram";
+import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { AssistantResponse, agent, connectOpenAI } from "service/openai";
-import { connectRedis, redisClient } from "service/redis";
+import { connectRedis } from "service/redis";
 import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
-import { ResponseType } from "types/openai";
-import { STORE_KEYS } from "types/redis";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
@@ -17,6 +15,11 @@ const assistantMessages: Array<AssistantResponse> = [];
 const messageQueue = new EventEmitter();
 const port = PORT || 3000;
 
+const enqueueAssistantMessage = (assitantResponse: AssistantResponse) => {
+  assistantMessages.push(assitantResponse);
+  messageQueue.emit("new_message");
+};
+
 const startServer = async () => {
   try {
     const server = createServer(app);
@@ -24,19 +27,24 @@ const startServer = async () => {
     const openaiClient = await connectOpenAI();
     wss.on("connection", (ws) => {
       console.info("New Client Connected");
-      const deepgramConnection = connectDeepgram();
+      const deepgramConnection = deepgramClient.listen.live({
+        model: "enhanced-phonecall",
+        smart_format: true,
+        encoding: "mulaw",
+        sample_rate: 8000,
+        channels: 1,
+      });
 
       deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
         deepgramConnection.on(
           LiveTranscriptionEvents.Transcript,
           async (transcription) => {
             const transcript = transcription.channel.alternatives[0].transcript;
-            console.info({ transcript });
 
             if (transcript) {
               transcriptCollection.push(transcript);
             }
-
+            console.info({ transcript });
             if (transcriptCollection.length < 1 || transcript) {
               return;
             }
@@ -44,10 +52,8 @@ const startServer = async () => {
             const userInput = transcriptCollection.join("");
             transcriptCollection = [];
             console.info({ userInput });
-            const assitantResponse = await agent(openaiClient, userInput);
-            assistantMessages.push(assitantResponse);
-            messageQueue.emit("new_message");
-          },
+            await agent(openaiClient, userInput, enqueueAssistantMessage);
+          }
         );
 
         deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
@@ -99,22 +105,15 @@ const startProcessingAssistantMessages = async () => {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       if (assistantMessages.length > 0) {
-        const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
         const message = assistantMessages.shift();
-        console.info({ message, callStatus });
-        if (callStatus !== "in-progress") {
-          const applicationStatus =
-            message?.responseType === ResponseType.END_CALL
-              ? message.applicationStatus
-              : "NA";
-          redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus);
-          console.info("Call is not in-progess cannot update call.");
+        if (!message || !message.content) {
+          console.info("Cannot Push Empty Message to Update Call");
           return;
         }
-        await updateInProgessCall(message!);
+        await updateInProgessCall(message);
       } else {
         await new Promise((resolve) =>
-          messageQueue.once("new_message", resolve),
+          messageQueue.once("new_message", resolve)
         );
       }
     }
@@ -123,6 +122,7 @@ const startProcessingAssistantMessages = async () => {
   }
 };
 
+connectDeepgram();
 connectTwilio();
 connectRedis();
 startServer();

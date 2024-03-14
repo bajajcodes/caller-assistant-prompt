@@ -30,21 +30,19 @@ export type AssistantResponse =
   | SendDigitsResponse
   | EndCallResponse;
 
-//TODO: intiailize or flush messages on call disconnect
-const messages: Array<ChatCompletionMessageParam> = [
-  { role: "system", content: systemPrompt },
-];
+let chatMessages: Array<ChatCompletionMessageParam> = [];
 
-const FALLBACK_RESPONSE: AssistantResponse = {
-  responseType: ResponseType.SAY_FOR_VOICE,
-  content: "",
+const intializeChatMessages = () => {
+  chatMessages = [];
+  chatMessages.push({ role: "system", content: systemPrompt });
 };
 
-export const connectOpenAI = async () => {
+const connectOpenAI = async () => {
   try {
     if (!OPEN_AI_KEY) {
       throw Error("Open AI Key is Missing");
     }
+    intializeChatMessages();
     return new OpenAI({ apiKey: OPEN_AI_KEY });
   } catch (err: $TSFixMe) {
     const message = err?.message || "Failed to Connect with OpenAI";
@@ -52,22 +50,36 @@ export const connectOpenAI = async () => {
   }
 };
 
-export const agent = async (
+const agent = async (
   openai: OpenAI,
   userInput: string,
-): Promise<AssistantResponse> => {
-  messages.push({ role: "user", content: `${userInput}` });
-  const response = await openai.chat.completions.create({
-    messages,
-    model: MODELS.GPT4_1106_PREVIEW,
-    response_format: {
-      type: "json_object",
-    },
-  });
-  const assistantPrompt = response.choices[0].message?.content;
-  messages.push({ role: "assistant", content: assistantPrompt });
-  const GPT_RESPONSE = JSON.parse(
-    assistantPrompt || `${FALLBACK_RESPONSE}`,
-  ) as AssistantResponse;
-  return GPT_RESPONSE;
+  onUpdate: (assistantPrompt: AssistantResponse) => void
+): Promise<void> => {
+  try {
+    chatMessages.push({ role: "user", content: userInput });
+    //TODO: use stream for quick responses
+    const completeion = await openai.chat.completions.create({
+      messages: chatMessages,
+      model: MODELS.GPT4_1106_PREVIEW,
+      response_format: {
+        type: "json_object",
+      },
+    });
+
+    const [choice] = completeion.choices;
+    const { content } = choice.message;
+    const assistantPrompt = content;
+
+    if (!assistantPrompt) return;
+
+    chatMessages.push({ role: "assistant", content: assistantPrompt });
+
+    const assistantResponse = JSON.parse(assistantPrompt) as AssistantResponse;
+    onUpdate(assistantResponse);
+  } catch (err: $TSFixMe) {
+    const message = err?.message || "Failed to get LLM or Assistant Response.";
+    throw Error(message);
+  }
 };
+
+export { agent, connectOpenAI, intializeChatMessages };
