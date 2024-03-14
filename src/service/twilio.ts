@@ -33,7 +33,7 @@ const hangupCall = async () => {
     const callSid = await getCallSid();
     if (!callSid) {
       console.info(
-        `Cannot hangup call, Because CallSid: ${callSid} does not exists.`
+        `Cannot hangup call, Because CallSid: ${callSid} does not exists.`,
       );
       return;
     }

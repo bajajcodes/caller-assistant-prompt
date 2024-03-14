@@ -7,7 +7,7 @@ import twillio from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
 import { STORE_KEYS } from "types/redis";
-import { CALL_TO_NUMBER } from "utils/config";
+import { TWILIO_FROM_NUMBER, TWILIO_TO_NUMBER } from "utils/config";
 
 const VoiceResponse = twillio.twiml.VoiceResponse;
 
@@ -35,8 +35,11 @@ app.get("/", (_, res) =>
 
 app.get("/makeacall", async (req, res) => {
   try {
-    if (!CALL_TO_NUMBER) {
+    if (!TWILIO_TO_NUMBER) {
       throw Error("Call To Number is Missing");
+    }
+    if (!TWILIO_FROM_NUMBER) {
+      throw Error("Call From Number is Missing");
     }
     const protocol = req.headers.protocol;
     const wsProtocol = req.headers.wsProtocol;
@@ -54,8 +57,8 @@ app.get("/makeacall", async (req, res) => {
     const twiml = response.toString();
     const call = await twilioClient.calls.create({
       twiml: twiml,
-      to: CALL_TO_NUMBER,
-      from: "+16572145787",
+      to: TWILIO_TO_NUMBER,
+      from: TWILIO_FROM_NUMBER,
       statusCallback: `${protocol}://${req.headers.host}/call-update`,
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
