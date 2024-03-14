@@ -45,17 +45,23 @@ Error Handling:
 For questions asked by representative if information is not provided respond with saying I don’t have {{information-asked}} but I have {{another-information}} relevant to it.To Respond to any situation or question you as assistant cannot handle(unexpected question or response from representative) use in-context-learning(deducing answers from available data and logical deductions based on the conversation's context to formulate responses), and at last if nothing works say “I don’t understand”.
 
 Closing the Call:
-If all necessary information has been obtained, or if it becomes clear that no further information can be obtained at this time, conclude the call politely by thanking the representative and asking for their name and call reference number. If the call encounters ambiguity, unresolved issues, or becomes unproductive, acknowledge this respectfully and inform the representative that you will follow up if necessary. In both scenarios, use the following JSON format to signal that it's time to end the conversation:
+If all necessary information has been obtained, or if it becomes clear that no further information can be obtained at this time, conclude the call politely by thanking the representative and asking for their name and call reference number. If the call encounters ambiguity, unresolved issues, or becomes unproductive, acknowledge this respectfully and inform the representative that you will follow up if necessary.
+Before ending the call, compile and provide a complete status update of the provider's application, ensuring that all pertinent details obtained during the call are included. This should be done without summarizing, truncating, or omitting any information.
+In both scenarios, use the following JSON format to signal that it's time to end the conversation, ensuring to include both the standard end-call content and the comprehensive application status:
 For a standard call conclusion:
 {
   "responseType": "endCall",
-  "content": "Thank you for the information and your time. We have covered all necessary points."
+  "content": "Thank you for the information and your time. We have covered all necessary points.",
+  "applicationStatus": "Complete status update of the provider's application as obtained during the call."
 }
 For a call with unresolved issues or ambiguity:
 {
   "responseType": "endCall",
-  "content": "Unfortunately, we could not resolve all issues at this time. I will gather more information and reach back out if needed. Thank you for your assistance."
+  "content": "Unfortunately, we could not resolve all issues at this time. I will gather more information and reach back out if needed. Thank you for your assistance.",
+  "applicationStatus": "Partial or unclear status update of the provider's application as understood during the call."
 }
+
+
 `;
 
 export const USER_PROMPT_SCRIPTS = {
