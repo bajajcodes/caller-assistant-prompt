@@ -33,10 +33,11 @@ const hangupCall = async () => {
     const callSid = await getCallSid();
     if (!callSid) {
       console.info(
-        `Cannot hangup call, Because CallSid: ${callSid} does not exists.`,
+        `Cannot hangup call, Because CallSid: ${callSid} does not exists.`
       );
       return;
     }
+    console.info("Hangup Call.");
     return await twilioClient.calls(callSid).update({ status: "completed" });
   } catch (err: $TSFixMe) {
     const message = err?.message || "Failed to Update Call";
