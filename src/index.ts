@@ -47,7 +47,7 @@ const startServer = async () => {
             const assitantResponse = await agent(openaiClient, userInput);
             assistantMessages.push(assitantResponse);
             messageQueue.emit("new_message");
-          }
+          },
         );
 
         deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
@@ -114,7 +114,7 @@ const startProcessingAssistantMessages = async () => {
         await updateInProgessCall(message!);
       } else {
         await new Promise((resolve) =>
-          messageQueue.once("new_message", resolve)
+          messageQueue.once("new_message", resolve),
         );
       }
     }

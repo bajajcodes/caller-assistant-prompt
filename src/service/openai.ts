@@ -7,10 +7,28 @@ import type { $TSFixMe } from "../types/common";
 import { OPEN_AI_KEY } from "../utils/config";
 import { systemPrompt } from "../utils/data";
 
-export interface AssistantResponse {
+interface BaseResponse {
   responseType: ResponseType;
   content: string;
 }
+
+interface SayForVoiceResponse extends BaseResponse {
+  responseType: ResponseType.SAY_FOR_VOICE;
+}
+
+interface SendDigitsResponse extends BaseResponse {
+  responseType: ResponseType.SEND_DIGITS;
+}
+
+export interface EndCallResponse extends BaseResponse {
+  responseType: ResponseType.END_CALL;
+  applicationStatus: string; // Only in this type
+}
+
+export type AssistantResponse =
+  | SayForVoiceResponse
+  | SendDigitsResponse
+  | EndCallResponse;
 
 //TODO: intiailize or flush messages on call disconnect
 const messages: Array<ChatCompletionMessageParam> = [

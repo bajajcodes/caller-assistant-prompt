@@ -95,6 +95,7 @@ app.post("/call-update", (req, res) => {
     "for Call SID:",
     req.body.CallSid,
   );
+  redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
   return res.status(200).send();
 });
 
