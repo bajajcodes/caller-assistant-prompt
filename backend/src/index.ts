@@ -2,10 +2,12 @@ import { LiveTranscriptionEvents } from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
-import { AssistantResponse, agent, connectOpenAI } from "service/openai";
-import { connectRedis } from "service/redis";
+import { agent, connectOpenAI } from "service/openai";
+import { connectRedis, redisClient } from "service/redis";
 import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
+import { AssistantResponse } from "types/openai";
+import { STORE_KEYS } from "types/redis";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
@@ -104,17 +106,21 @@ const startProcessingAssistantMessages = async () => {
   try {
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      if (assistantMessages.length > 0) {
+      const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
+      if (callSid && assistantMessages.length > 0) {
         const message = assistantMessages.shift();
         if (!message || !message.content) {
           console.info("Cannot Push Empty Message to Update Call");
           return;
         }
-        await updateInProgessCall(message);
+        await updateInProgessCall(callSid, message);
       } else {
         await new Promise((resolve) =>
           messageQueue.once("new_message", resolve)
         );
+      }
+      if (!callSid) {
+        console.error("Call Sid is Missing.");
       }
     }
   } catch (err) {

@@ -1,57 +1,54 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
+import { getChatMessages, intializeChatMessages } from "service/openai";
 import { redisClient } from "service/redis";
 import { twilioClient } from "service/twilio";
 import twillio from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
 import { STORE_KEYS } from "types/redis";
-import { TWILIO_FROM_NUMBER, TWILIO_TO_NUMBER } from "utils/config";
+import { TWILIO_FROM_NUMBER } from "utils/config";
 
 const VoiceResponse = twillio.twiml.VoiceResponse;
-
 const app: Express = express();
 
-//TODO: allow set of origins
 app.use(cors());
 app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
+app.use(express.static("build"));
 
 app.use(async (req, _, next) => {
-  await redisClient.set(STORE_KEYS.HOST, req.headers.host!);
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
-  const wsProtocol = "wss";
+  const wsProtocol = protocol === "https" ? "wss" : "ws";
   req.headers.protocol = protocol;
   req.headers.wsProtocol = wsProtocol;
+  await redisClient.set(STORE_KEYS.HOST, req.headers.host!);
   next();
 });
 
-app.get("/", (_, res) =>
-  res.type("text").send("Hello World 👋, from Caller Assistant!!")
-);
+app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
-app.get("/data", (_, res) => {
-  res.json({
-    data: `internalId	applicationId	applicationSubmissionMethod	applicationSubmittedDate	groupName	groupNpi	groupTaxId	internalId	payerName	phoneNumber	providerAddress	providerName	providerNpi	providerSpecialty	providerType	serviceState	ticketType
-    149483	Not Available		17/07/2023	VANCOUVER SLEEP CENTER, LLC	1285012963	473557616		Asuris Northwest Health	8883496558	12405 SE 2nd Cir  Vancouver WA 98684	CHARITY  KEMP	1487261798	Physician Assistant	Medical Providers	WA	Application Follow-up`,
-  });
+app.get("/transcription", (_, res) => {
+  const chatMessages = getChatMessages();
+  res.json({ transcription: chatMessages });
 });
 
-app.get("/makeacall", async (req, res) => {
+app.post("/makeacall", async (req, res) => {
   try {
-    if (!TWILIO_TO_NUMBER) {
-      throw Error("Call To Number is Missing");
+    const twilioCallToNumber = req.body.twilioCallToNumber;
+    const providerData = req.body.providerData;
+    if (!twilioCallToNumber || !providerData) {
+      throw Error("Call To Number or Provider Data is Missing");
     }
     if (!TWILIO_FROM_NUMBER) {
       throw Error("Call From Number is Missing");
     }
-    const protocol = req.headers.protocol;
-    const wsProtocol = req.headers.wsProtocol;
     const response = new VoiceResponse();
     const connect = response.connect();
     response.say("");
     connect.stream({
-      url: `${wsProtocol}://${req.headers.host}`,
+      url: `${req.headers.wsProtocol}://${req.headers.host}`,
       track: "inbound_track",
     });
     response.pause({
@@ -60,20 +57,34 @@ app.get("/makeacall", async (req, res) => {
     const twiml = response.toString();
     const call = await twilioClient.calls.create({
       twiml,
-      to: TWILIO_TO_NUMBER,
+      to: twilioCallToNumber,
       from: TWILIO_FROM_NUMBER,
-      statusCallback: `${protocol}://${req.headers.host}/callupdate`,
+      record: true,
+      statusCallback: `${req.headers.protocol}://${req.headers.host}/callupdate`,
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
-      record: true,
     });
-    await redisClient.set(STORE_KEYS.CALL_SID, call.sid);
-    res.type("text").send(`Call initiated with SID: ${call.sid}`);
+    // await redisClient.hSet(call.sid, {
+    //   providerData,
+    //   callSid: call.sid,
+    //   callStatus: "",
+    //   applicationStatus: "",
+    // });
+    redisClient.set(STORE_KEYS.CALL_SID, call.sid);
+    redisClient.set(STORE_KEYS.PROVIDER_DATA, providerData);
+    intializeChatMessages(providerData);
+    console.info(`Call initiated with SID: ${call.sid}`);
+    res.json({
+      message: `Call initiated with SID: ${call.sid}`,
+      callSid: call.sid,
+      callInitiated: true,
+    });
   } catch (err: $TSFixMe) {
-    res
-      .type("text")
-      .status(400)
-      .send(err?.message || "Failed to create call");
+    console.error({ err });
+    res.status(400).json({
+      message: "Failed to initiate call",
+      callInitiated: false,
+    });
   }
 });
 
@@ -84,14 +95,12 @@ app.post("/callupdate", async (req, res) => {
     "for Call SID:",
     req.body.CallSid
   );
-  await redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
-  return res.status(200).send();
-});
-
-app.post("/applicationupdate", async (req, res) => {
-  const applicationStatus = req.body.applicationStatus;
-  console.info({ applicationStatus });
-  await redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus);
+  // const call = await redisClient.hGetAll(req.body.callSid);
+  // await redisClient.hSet(call.callSid, {
+  //   ...call,
+  //   callStatus: req.body.CallStatus,
+  // });
+  redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
   return res.status(200).send();
 });
 
