@@ -3,4 +3,5 @@ export enum STORE_KEYS {
   CALL_STATUS = "call_status",
   APPLICATION_STATUS = "application_status",
   HOST = "host",
+  PROVIDER_DATA = "provider_data",
 }

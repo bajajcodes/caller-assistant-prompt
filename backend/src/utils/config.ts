@@ -10,8 +10,10 @@ const PORT = process.env.PORT;
 const REDIS_CLIENT_URL = process.env.REDIS_CLIENT_URL;
 const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+const API_BASE_URL = process.env.API_BASE_URL;
 
 export {
+  API_BASE_URL,
   DEEPGRAM_API_KEY,
   OPEN_AI_KEY,
   PORT,

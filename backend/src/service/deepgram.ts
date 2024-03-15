@@ -13,8 +13,8 @@ const connectDeepgram = () => {
     deepgramClient = createClient(DEEPGRAM_API_KEY);
     console.info("Connected to Deepgram Client");
   } catch (err: $TSFixMe) {
-    const message = err?.message || "Failed to Connect with Deepgram";
-    console.error(message);
+    const reason = err?.message;
+    console.error({ message: "Failed to Connect with Deepgram", reason });
     throw err;
   }
 };
