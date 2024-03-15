@@ -30,6 +30,13 @@ app.get("/", (_, res) =>
   res.type("text").send("Hello World 👋, from Caller Assistant!!")
 );
 
+app.get("/data", (_, res) => {
+  res.json({
+    data: `internalId	applicationId	applicationSubmissionMethod	applicationSubmittedDate	groupName	groupNpi	groupTaxId	internalId	payerName	phoneNumber	providerAddress	providerName	providerNpi	providerSpecialty	providerType	serviceState	ticketType
+    149483	Not Available		17/07/2023	VANCOUVER SLEEP CENTER, LLC	1285012963	473557616		Asuris Northwest Health	8883496558	12405 SE 2nd Cir  Vancouver WA 98684	CHARITY  KEMP	1487261798	Physician Assistant	Medical Providers	WA	Application Follow-up`,
+  });
+});
+
 app.get("/makeacall", async (req, res) => {
   try {
     if (!TWILIO_TO_NUMBER) {
@@ -55,7 +62,7 @@ app.get("/makeacall", async (req, res) => {
       twiml,
       to: TWILIO_TO_NUMBER,
       from: TWILIO_FROM_NUMBER,
-      statusCallback: `${protocol}://${req.headers.host}/call-update`,
+      statusCallback: `${protocol}://${req.headers.host}/callupdate`,
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
       record: true,
@@ -70,7 +77,7 @@ app.get("/makeacall", async (req, res) => {
   }
 });
 
-app.post("/call-update", async (req, res) => {
+app.post("/callupdate", async (req, res) => {
   console.info(
     "Call Status Update:",
     req.body.CallStatus,
@@ -78,6 +85,13 @@ app.post("/call-update", async (req, res) => {
     req.body.CallSid
   );
   await redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
+  return res.status(200).send();
+});
+
+app.post("/applicationupdate", async (req, res) => {
+  const applicationStatus = req.body.applicationStatus;
+  console.info({ applicationStatus });
+  await redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus);
   return res.status(200).send();
 });
 

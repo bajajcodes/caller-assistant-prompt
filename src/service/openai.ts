@@ -37,6 +37,28 @@ const intializeChatMessages = () => {
   chatMessages.push({ role: "system", content: systemPrompt });
 };
 
+const updateApplicationStatus = async (applicationStatus: string) => {
+  await fetch("http://localhost:3000/applicationupdate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ applicationStatus }),
+  });
+};
+
+const getDataOrDataPresentation = async () => {
+  const response = await fetch("http://localhost:3000/data");
+  const data = await response.json();
+  console.info({ data });
+  return data.data;
+};
+
+const availableTools: { [key: string]: (...args: $TSFixMe[]) => $TSFixMe } = {
+  updateApplicationStatus,
+  getDataOrDataPresentation,
+};
+
 const connectOpenAI = async () => {
   try {
     if (!OPEN_AI_KEY) {
@@ -57,21 +79,70 @@ const agent = async (
 ): Promise<void> => {
   try {
     chatMessages.push({ role: "user", content: userInput });
-    //TODO: use stream for quick responses
+    //TODO: test the function calls.
     const completeion = await openai.chat.completions.create({
       messages: chatMessages,
       model: MODELS.GPT4_1106_PREVIEW,
       response_format: {
         type: "json_object",
       },
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "getDataOrDataPresentation",
+            description:
+              "Get the provider application data or data presentation.",
+            parameters: {
+              type: "object",
+              properties: {},
+            },
+          },
+        },
+        {
+          type: "function",
+          function: {
+            name: "updateApplicationStatus",
+            description: "Update the provider application status update.",
+            parameters: {
+              type: "object",
+              properties: {
+                applicationStatus: {
+                  type: "string",
+                },
+              },
+              required: ["applicationStatus"],
+            },
+          },
+        },
+      ],
     });
 
     const [choice] = completeion.choices;
-    const { content } = choice.message;
+    const { finish_reason, message } = choice;
+    const { content } = message;
     const assistantPrompt = content;
 
     if (!assistantPrompt) return;
 
+    if (finish_reason === "tool_calls" && message.tool_calls) {
+      const functionName = message.tool_calls[0].function.name;
+      const functionToCall = availableTools[functionName];
+      const functionArgs = JSON.parse(message.tool_calls[0].function.arguments);
+      const functionArgsArr = Object.values(functionArgs);
+      // eslint-disable-next-line prefer-spread
+      const functionResponse = await functionToCall.apply(
+        null,
+        functionArgsArr
+      );
+      chatMessages.push({
+        role: "function",
+        name: functionName,
+        content: ` The result of the last function was this: ${JSON.stringify(functionResponse)}`,
+      });
+      console.info({ functionResponse });
+      return;
+    }
     chatMessages.push({ role: "assistant", content: assistantPrompt });
 
     const assistantResponse = JSON.parse(assistantPrompt) as AssistantResponse;
