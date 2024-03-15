@@ -41,6 +41,7 @@ const hangupCall = async (message: EndCallResponse) => {
       STORE_KEYS.APPLICATION_STATUS,
       message.applicationStatus
     );
+    console.info(`Application Status: ${message.applicationStatus}`);
     console.info("Hangup Call.");
     return await twilioClient.calls(callSid).update({ status: "completed" });
   } catch (err: $TSFixMe) {
@@ -87,7 +88,12 @@ const updateInProgessCall = async (message: AssistantResponse) => {
       twiml,
     });
   } catch (err: $TSFixMe) {
-    const message = err?.message || "Failed to Update Call";
+    const message = err?.message || ("Failed to Update Call" as string);
+    if (err?.code == 21220) {
+      console.error({ message, code: err.code });
+      //TODO: add more strong error handling here
+      return;
+    }
     throw Error(message);
   }
 };
