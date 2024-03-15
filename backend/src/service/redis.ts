@@ -18,7 +18,8 @@ const connectRedis = async () => {
     console.info("Connected to Redis Client");
   } catch (err: $TSFixMe) {
     const message = err?.message || "Failed to Connect to Redis";
-    throw Error(message);
+    console.error(message);
+    throw err;
   }
 };
 

@@ -22,7 +22,8 @@ const connectTwilio = () => {
     console.info("Connected to Twilio Client");
   } catch (err: $TSFixMe) {
     const message = err?.message || "Failed to Update Call";
-    throw Error(message);
+    console.error(message);
+    throw err;
   }
 };
 
@@ -45,8 +46,9 @@ const hangupCall = async (message: EndCallResponse) => {
     console.info("Hangup Call.");
     return await twilioClient.calls(callSid).update({ status: "completed" });
   } catch (err: $TSFixMe) {
-    const message = err?.message || "Failed to Update Call";
-    throw Error(message);
+    const message = err?.message || "Failed to Hangup Call";
+    console.error(message);
+    throw err;
   }
 };
 
@@ -94,7 +96,8 @@ const updateInProgessCall = async (message: AssistantResponse) => {
       //TODO: add more strong error handling here
       return;
     }
-    throw Error(message);
+    console.error(message);
+    throw err;
   }
 };
 

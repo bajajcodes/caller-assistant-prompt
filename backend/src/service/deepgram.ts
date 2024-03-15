@@ -14,7 +14,8 @@ const connectDeepgram = () => {
     console.info("Connected to Deepgram Client");
   } catch (err: $TSFixMe) {
     const message = err?.message || "Failed to Connect with Deepgram";
-    throw Error(message);
+    console.error(message);
+    throw err;
   }
 };
 

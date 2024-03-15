@@ -68,7 +68,8 @@ const connectOpenAI = async () => {
     return new OpenAI({ apiKey: OPEN_AI_KEY });
   } catch (err: $TSFixMe) {
     const message = err?.message || "Failed to Connect with OpenAI";
-    throw Error(message);
+    console.error(message);
+    throw err;
   }
 };
 
@@ -130,11 +131,18 @@ const agent = async (
       const functionToCall = availableTools[functionName];
       const functionArgs = JSON.parse(message.tool_calls[0].function.arguments);
       const functionArgsArr = Object.values(functionArgs);
+      console.info({
+        functionName,
+        functionToCall,
+        functionArgs,
+        functionArgsArr,
+      });
       // eslint-disable-next-line prefer-spread
       const functionResponse = await functionToCall.apply(
         null,
         functionArgsArr
       );
+      console.info({ functionResponse });
       chatMessages.push({
         role: "function",
         name: functionName,
@@ -144,12 +152,13 @@ const agent = async (
       return;
     }
     chatMessages.push({ role: "assistant", content: assistantPrompt });
-
+    console.info({ assistantPrompt });
     const assistantResponse = JSON.parse(assistantPrompt) as AssistantResponse;
     onUpdate(assistantResponse);
   } catch (err: $TSFixMe) {
     const message = err?.message || "Failed to get LLM or Assistant Response.";
-    throw Error(message);
+    console.error(message);
+    throw err;
   }
 };
 
