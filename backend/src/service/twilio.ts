@@ -35,7 +35,7 @@ const hangupCall = async (callSid: string, message: EndCallResponse) => {
       );
       return;
     }
-    console.info(`Application Status: ${message.applicationStatus}`);
+    console.info(`Application Status: ${message?.applicationStatus}`);
     // const call = await redisClient.hGetAll(callSid);
     // await redisClient.hSet(callSid, {
     //   ...call,
@@ -106,7 +106,8 @@ const updateInProgessCall = async (
         message.responseType === ResponseType.END_CALL
           ? message.applicationStatus
           : "NA";
-      redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus);
+      await redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus);
+      hangupCall(callSid, message as EndCallResponse);
       return;
     }
     throw err;
