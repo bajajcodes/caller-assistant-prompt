@@ -74,7 +74,7 @@ const updateInProgessCall = async (
     if (responseType === ResponseType.SEND_DIGITS) {
       const digits = content
         .split("")
-        .map((digit) => `w${digit}`)
+        .map((digit) => `${digit === "#" ? "" : "w"}${digit}`)
         .join("");
       response.play({
         digits,
@@ -102,6 +102,11 @@ const updateInProgessCall = async (
         callSid,
         reason,
       });
+      const applicationStatus =
+        message.responseType === ResponseType.END_CALL
+          ? message.applicationStatus
+          : "NA";
+      redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus);
       return;
     }
     throw err;
