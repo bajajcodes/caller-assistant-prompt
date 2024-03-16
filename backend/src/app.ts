@@ -29,6 +29,17 @@ app.use(async (req, _, next) => {
 
 app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
+app.get("/callstatus", async (_, res) => {
+  const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
+  if (callStatus === "completed") {
+    const applicationStatus = await redisClient.get(
+      STORE_KEYS.APPLICATION_STATUS
+    );
+    console.info({ applicationStatus });
+  }
+  return res.json({ callStatus });
+});
+
 app.get("/transcription", (_, res) => {
   const chatMessages = getChatMessages();
   res.json({ transcription: chatMessages });

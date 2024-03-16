@@ -31,6 +31,13 @@ const transcriptionFetcher = async () => {
   return data.transcription;
 };
 
+const getCallStatus = async () => {
+  const response = await fetch(`${API_BASE_URL}/callstatus`);
+  const data = await response.json();
+  console.info({ data });
+  return data.callStatus;
+};
+
 function App() {
   const { trigger, data, isMutating } = useSWRMutation(
     "/makeacall",
@@ -94,6 +101,14 @@ const FetchAndRender = ({
   data: Record<string, any>;
   isLoading: boolean;
 }) => {
+  const { data: callStatus, isLoading: callStatusLoading } = useSWR(
+    "/callstatus",
+    getCallStatus,
+    {
+      refreshInterval: 3000,
+    }
+  );
+  console.log({ callStatus, callStatusLoading });
   return (
     <div>
       {!data?.callInitiated && data?.message && (
@@ -103,6 +118,9 @@ const FetchAndRender = ({
         <p className="text-green-500 font-semibold">{data.message}</p>
       )}
       {isLoading && <p className="text-yellow-500 font-semibold">Loading...</p>}
+      {/* {!callStatusLoading && ( */}
+      <p className="text-cyan-500 font-bold">{JSON.stringify(callStatus)}</p>
+      {/* )} */}
     </div>
   );
 };

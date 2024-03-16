@@ -28,13 +28,13 @@ export const systemPromptCollection: Array<{
     Example for input source from an IVR system:
     {
       "inputSource": "IVR",
-      "responseType": "Your response type here",
+      "responseType": "sendDigits",
       "content": "Your response here"
     }
     Example for input source from a human customer service representative
     {
       "inputSource": "Human",
-      "responseType": "Your response type here",
+      "responseType": "sayForVoice",
       "content": "Your response here"
     }`,
   },
