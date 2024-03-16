@@ -35,7 +35,7 @@ const hangupCall = async (callSid: string, message: EndCallResponse) => {
       );
       return;
     }
-    console.info(`Application Status: ${message?.applicationStatus}`);
+    console.info(`Application Status: ${message.applicationStatus || "NA"}`);
     // const call = await redisClient.hGetAll(callSid);
     // await redisClient.hSet(callSid, {
     //   ...call,
