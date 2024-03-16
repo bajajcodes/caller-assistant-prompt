@@ -6,20 +6,18 @@ import { agent, connectOpenAI } from "service/openai";
 import { connectRedis, redisClient } from "service/redis";
 import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
-import { AssistantResponse, InputSource, ResponseType } from "types/openai";
+import { AssistantResponse } from "types/openai";
 import { STORE_KEYS } from "types/redis";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
 
 let transcriptCollection: Array<string> = [];
-let inputSource: InputSource;
 const assistantMessages: Array<AssistantResponse> = [];
 const messageQueue = new EventEmitter();
 const port = PORT || 3000;
 
 const enqueueAssistantMessage = (assitantResponse: AssistantResponse) => {
-  inputSource = assitantResponse.inputSource;
   assistantMessages.push(assitantResponse);
   messageQueue.emit("new_message");
 };
@@ -55,15 +53,7 @@ const startServer = async () => {
 
             const userInput = transcriptCollection.join("");
             transcriptCollection = [];
-            console.info({ userInput, inputSource });
-            if (inputSource === InputSource.HUMAN) {
-              enqueueAssistantMessage({
-                responseType: ResponseType.SAY_FOR_VOICE,
-                inputSource,
-                content:
-                  "I am AI Caller Assistant, and will take a moment to reply.",
-              });
-            }
+            console.info({ userInput });
             await agent(openaiClient, userInput, enqueueAssistantMessage);
           }
         );

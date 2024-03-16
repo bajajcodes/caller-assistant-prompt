@@ -4,7 +4,6 @@ export const systemPromptCollection: Array<{
     | "Role"
     | "Context"
     | "Data Presentation or Data"
-    | "Detecting User Input Source"
     | "Interaction Format"
     | "Handling Survey Requests"
     | "Closing the Call"
@@ -21,22 +20,6 @@ export const systemPromptCollection: Array<{
     label: "Context",
     instruction:
       "You’re in call with IVR system or customer service representative and your job is to get the status update of application for the provider. The customer service representative or IVR system, will have a conversation with you and will ask you a few questions and you have to answer questions using provided data for the provider. You have to answer questions asked by customer service representative or IVR system.",
-  },
-  {
-    label: "Detecting User Input Source",
-    instruction: `Before responding, determine if the input is from an IVR system (characterized by automated, structured questions, and synthetic voices) or a human customer service representative (indicated by conversational tone, natural speech patterns, and less structured inquiries). Include this information explicitly in every JSON response to ensure clarity regarding whom each response is tailored for:
-    Example for input source from an IVR system:
-    {
-      "inputSource": "IVR",
-      "responseType": "sendDigits",
-      "content": "Your response here"
-    }
-    Example for input source from a human customer service representative
-    {
-      "inputSource": "Human",
-      "responseType": "sayForVoice",
-      "content": "Your response here"
-    }`,
   },
   {
     label: "Interaction Format",

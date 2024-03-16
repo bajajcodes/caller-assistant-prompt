@@ -9,13 +9,12 @@ export enum ResponseType {
   END_CALL = "endCall",
 }
 
-export enum InputSource {
-  HUMAN = "Human",
-  IVR = "IVR",
-}
+// export enum InputSource {
+//   HUMAN = "Human",
+//   IVR = "IVR",
+// }
 
 interface BaseResponse {
-  inputSource: InputSource;
   responseType: ResponseType;
   content: string;
 }
