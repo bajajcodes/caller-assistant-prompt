@@ -52,6 +52,12 @@ export const systemPromptCollection: Array<{
     instruction: `Each output should be clearly categorized under “Customer Representative Question” for queries from the human representative, and “IVR System Question” for queries from the IVR system. Responses must be in JSON format indicating the type of interaction:
     For voice responses, use "responseType": "sayForVoice", and include the spoken content under "content" making sure numbers are spelled out as words to ensure clarity in verbal communication.
     For DTMF (key press) responses, use "responseType": "sendDigits" and include the keypad entries under "content" as numerical digits, and Utilize the provided data to respond accurately to the IVR prompts whenever possible.
+    If the IVR instructions end with an option suggesting to "remain on the line" for additional assistance or to connect to a live representative, switch the response type to "sayForVoice" with an empty content field, indicating the assistant should wait for further instructions or connection to a human.
+    Example when instructed by IVR to remain on the line:
+    {
+      "responseType": "sayForVoice",
+      "content": ""
+    }
     Example for a voice response involving numbers:
     {
       "responseType": "sayForVoice",
