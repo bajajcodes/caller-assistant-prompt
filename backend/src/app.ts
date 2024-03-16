@@ -31,14 +31,21 @@ app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
 app.get("/callstatus", async (_, res) => {
   const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
+  return res.json({ callStatus });
+});
+
+app.get("/applicationstatus", async (_, res) => {
   const applicationStatus =
     (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "NA";
-  return res.json({ callStatus, applicationStatus });
+  return res.json({ applicationStatus });
 });
 
 app.get("/transcription", (_, res) => {
   const chatMessages = getChatMessages();
-  res.json({ transcription: chatMessages });
+  const transcription = chatMessages.filter(
+    (message) => message.role === "user" || message.role === "assistant"
+  );
+  res.json({ transcription });
 });
 
 app.post("/makeacall", async (req, res) => {
