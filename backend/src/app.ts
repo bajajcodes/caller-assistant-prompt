@@ -31,13 +31,9 @@ app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
 app.get("/callstatus", async (_, res) => {
   const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
-  if (callStatus === "completed") {
-    const applicationStatus = await redisClient.get(
-      STORE_KEYS.APPLICATION_STATUS
-    );
-    console.info({ applicationStatus });
-  }
-  return res.json({ callStatus });
+  const applicationStatus =
+    (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "NA";
+  return res.json({ callStatus, applicationStatus });
 });
 
 app.get("/transcription", (_, res) => {
@@ -83,6 +79,8 @@ app.post("/makeacall", async (req, res) => {
     // });
     redisClient.set(STORE_KEYS.CALL_SID, call.sid);
     redisClient.set(STORE_KEYS.PROVIDER_DATA, providerData);
+    redisClient.set(STORE_KEYS.APPLICATION_STATUS, "NA");
+    redisClient.set(STORE_KEYS.CALL_STATUS, "");
     intializeChatMessages(providerData);
     console.info(`Call initiated with SID: ${call.sid}`);
     res.json({
