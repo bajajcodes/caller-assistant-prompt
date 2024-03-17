@@ -5,7 +5,7 @@ import { AssistantResponse, MODELS } from "types/openai";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { systemPromptCollection } from "utils/data";
 import type { $TSFixMe } from "../types/common";
-import { OPEN_AI_KEY } from "../utils/config";
+import { LLM_MODEL_SWITCH_DURATION, OPEN_AI_KEY } from "../utils/config";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const tools = [
@@ -39,6 +39,29 @@ const tools = [
 ];
 
 let chatMessages: Array<ChatCompletionMessageParam> = [];
+const timeout = LLM_MODEL_SWITCH_DURATION
+  ? parseInt(LLM_MODEL_SWITCH_DURATION, 10)
+  : 90000;
+let timeoutId: NodeJS.Timeout;
+let LLM_MODEL = MODELS.GPT_3_5_TUBRO;
+
+export const resetLLMModelTimer = () => {
+  if (timeoutId) {
+    console.info(
+      `Resetting 1 minute 30 seconds of timer. Switching from: ${LLM_MODEL} to: ${MODELS.GPT_3_5_TUBRO}.`
+    );
+    LLM_MODEL = MODELS.GPT_3_5_TUBRO;
+    clearTimeout(timeoutId);
+  }
+  timeoutId = setTimeout(() => {
+    //INFO: closure get's applied here
+    console.info(
+      `1 minute 30 seconds of timer done. Switching from: ${LLM_MODEL} to: ${MODELS.GPT4_1106_PREVIEW}.`
+    );
+    LLM_MODEL = MODELS.GPT4_1106_PREVIEW;
+  }, timeout);
+  console.info("Switch LLM Model Timer Started.");
+};
 
 const updateApplicationStatus = async (applicationStatus: string) => {
   await fetch("http://localhost:3000/applicationupdate", {
@@ -101,7 +124,7 @@ const agent = async (
     //TODO: test the function calls.
     const completeion = await openai.chat.completions.create({
       messages: chatMessages,
-      model: MODELS.GPT4_1106_PREVIEW,
+      model: LLM_MODEL,
       response_format: {
         type: "json_object",
       },
@@ -111,7 +134,7 @@ const agent = async (
     const { message } = choice;
     const { content } = message;
     const assistantPrompt = content;
-    console.info({ assistantPrompt });
+    console.info({ assistantPrompt, model: completeion.model });
 
     if (!assistantPrompt) return;
 

@@ -1,7 +1,11 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { getChatMessages, intializeChatMessages } from "service/openai";
+import {
+  getChatMessages,
+  intializeChatMessages,
+  resetLLMModelTimer,
+} from "service/openai";
 import { redisClient } from "service/redis";
 import { twilioClient } from "service/twilio";
 import twillio from "twilio";
@@ -68,6 +72,7 @@ app.post("/makeacall", async (req, res) => {
     response.pause({
       length: 120,
     });
+    const providerDataStringified = JSON.stringify(providerData);
     const twiml = response.toString();
     const call = await twilioClient.calls.create({
       twiml,
@@ -78,17 +83,12 @@ app.post("/makeacall", async (req, res) => {
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     });
-    // await redisClient.hSet(call.sid, {
-    //   providerData,
-    //   callSid: call.sid,
-    //   callStatus: "",
-    //   applicationStatus: "",
-    // });
+    resetLLMModelTimer();
+    intializeChatMessages(providerDataStringified);
     redisClient.set(STORE_KEYS.CALL_SID, call.sid);
-    redisClient.set(STORE_KEYS.PROVIDER_DATA, providerData);
+    redisClient.set(STORE_KEYS.PROVIDER_DATA, providerDataStringified);
     redisClient.set(STORE_KEYS.APPLICATION_STATUS, "NA");
     redisClient.set(STORE_KEYS.CALL_STATUS, "");
-    intializeChatMessages(providerData);
     console.info(`Call initiated with SID: ${call.sid}`);
     res.json({
       message: `Call initiated with SID: ${call.sid}`,
