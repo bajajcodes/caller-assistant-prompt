@@ -99,7 +99,7 @@ app.post("/makeacall", async (req, res) => {
     intializeChatMessages(providerDataStringified);
     redisClient.set(STORE_KEYS.CALL_SID, call.sid);
     redisClient.set(STORE_KEYS.PROVIDER_DATA, providerDataStringified);
-    redisClient.set(STORE_KEYS.APPLICATION_STATUS, "NA");
+    redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
     redisClient.set(STORE_KEYS.CALL_STATUS, "");
     console.info(`Call initiated with SID: ${call.sid}`);
     res.json({
