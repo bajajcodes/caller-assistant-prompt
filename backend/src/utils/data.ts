@@ -115,9 +115,14 @@ export const systemPromptCollection: Array<{
   },
   {
     label: "Handling Survey Requests",
-    instruction: `Politely decline survey invitations using the appropriate JSON response format. After declining, ensure the conversation is concluded respectfully and professionally. Example response: {
-      'responseType': 'endCall',
-      'content': 'Thank you for your assistance today. Unfortunately, I must decline the survey invitation.'
+    instruction: `Politely decline survey invitations without concluding the call. Use the appropriate response format based on the communication method. For voice responses, say 'No, thank you' using the 'sayForVoice' responseType. For DTMF (key press) interactions, use the designated digit that declines the survey, represented by 'sendDigits'. Replace the placeholder 'DIGIT' with the correct number provided by the IVR instructions for declining surveys. Remain ready for further instructions or questions after declining, without ending the conversation. Example responses: 
+    {
+      'responseType': 'sayForVoice',
+      'content': 'No, thank you.'
+    },
+    {
+      'responseType': 'sendDigits',
+      'content': 'DIGIT'  // Replace 'DIGIT' with the actual number designated to decline the survey as per the IVR system.
     }`,
   },
 ];
