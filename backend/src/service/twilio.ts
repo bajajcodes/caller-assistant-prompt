@@ -3,8 +3,9 @@ import twillio, { Twilio } from "twilio";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { STORE_KEYS } from "types/redis";
-import { AssistantResponse, EndCallResponse } from "../types/openai";
+import { AssistantResponse } from "../types/openai";
 import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "../utils/config";
+import { applicationStatusAgent } from "./openai";
 import { redisClient } from "./redis";
 
 let twilioClient: Twilio;
@@ -27,7 +28,7 @@ const connectTwilio = () => {
   }
 };
 
-const hangupCall = async (callSid: string, message: EndCallResponse) => {
+const hangupCall = async (callSid: string) => {
   try {
     if (!callSid) {
       console.info(
@@ -35,16 +36,9 @@ const hangupCall = async (callSid: string, message: EndCallResponse) => {
       );
       return;
     }
-    console.info(`Application Status: ${message.applicationStatus || "NA"}`);
-    // const call = await redisClient.hGetAll(callSid);
-    // await redisClient.hSet(callSid, {
-    //   ...call,
-    //   applicationStatus: message.applicationStatus,
-    // });
-    redisClient.set(
-      STORE_KEYS.APPLICATION_STATUS,
-      message.applicationStatus || "NA"
-    );
+    const applicationStatus = await applicationStatusAgent();
+    console.info(`Application Status: ${applicationStatus || "NA"}`);
+    redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus || "NA");
     console.info("Hangup Call Done.");
     return await twilioClient.calls(callSid).update({ status: "completed" });
   } catch (err: $TSFixMe) {
@@ -64,7 +58,7 @@ const updateInProgessCall = async (
       throw Error(`Cannot Update Call, CallSid: ${callSid} Doesn't Exists.`);
     }
     if (responseType === ResponseType.END_CALL) {
-      return await hangupCall(callSid, message as EndCallResponse);
+      return await hangupCall(callSid);
     }
     const host = await redisClient.get(STORE_KEYS.HOST);
     const response = new VoiceResponse();
@@ -102,12 +96,7 @@ const updateInProgessCall = async (
         callSid,
         reason,
       });
-      const applicationStatus =
-        message.responseType === ResponseType.END_CALL
-          ? message.applicationStatus
-          : "NA";
-      await redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus);
-      hangupCall(callSid, message as EndCallResponse);
+      await hangupCall(callSid);
       return;
     }
     throw err;
