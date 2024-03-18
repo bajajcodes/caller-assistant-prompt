@@ -3,7 +3,7 @@ import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { AssistantResponse, MODELS } from "types/openai";
 //TODO: fix no-unused-vars for $TSFixMe type
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { systemPromptCollection } from "utils/data";
+import { applicationStatusPrompt, systemPromptCollection } from "utils/data";
 import type { $TSFixMe } from "../types/common";
 import { LLM_MODEL_SWITCH_DURATION, OPEN_AI_KEY } from "../utils/config";
 
@@ -44,6 +44,7 @@ const timeout = LLM_MODEL_SWITCH_DURATION
   : 90000;
 let timeoutId: NodeJS.Timeout;
 let LLM_MODEL = MODELS.GPT_3_5_TUBRO;
+let openaiClient: OpenAI;
 
 export const resetLLMModelTimer = () => {
   if (timeoutId) {
@@ -106,7 +107,8 @@ const connectOpenAI = async () => {
     if (!OPEN_AI_KEY) {
       throw Error("Open AI Key is Missing");
     }
-    return new OpenAI({ apiKey: OPEN_AI_KEY });
+    openaiClient = new OpenAI({ apiKey: OPEN_AI_KEY });
+    return openaiClient;
   } catch (err: $TSFixMe) {
     const reason = err?.message;
     console.error({ message: "Failed to Connect with OpenAI", reason });
@@ -176,4 +178,64 @@ const agent = async (
   }
 };
 
-export { agent, connectOpenAI, getChatMessages, intializeChatMessages };
+const applicationStatusAgent = async () => {
+  try {
+    //TODO: transform chat history while pushing into array/collection
+    const chatMessagesTransformed = chatMessages
+      .filter(
+        (message) => message.role === "user" || message.role === "assistant"
+      )
+      .map((message) => {
+        if (message.role === "user") return message;
+        const assistantMessageContent = message.content
+          ? JSON.parse(message.content)
+          : message.content;
+        const actualMessage = assistantMessageContent.content;
+        console.log({ actualMessage });
+        return {
+          ...message,
+          content: actualMessage,
+        };
+      });
+    const userContent = `I need to check the status of my application based on the following chat history: ${JSON.stringify(chatMessagesTransformed)}`;
+
+    const systemContent = applicationStatusPrompt.reduce(
+      (prompt, item) => `${prompt} ${item.label}:${item.instruction} `,
+      ""
+    );
+    const messages: Array<ChatCompletionMessageParam> = [
+      {
+        role: "system",
+        content: systemContent,
+      },
+      {
+        role: "user",
+        content: userContent,
+      },
+    ];
+    const completeion = await openaiClient.chat.completions.create({
+      messages,
+      model: MODELS.GPT4_1106_PREVIEW,
+    });
+    const [choice] = completeion.choices;
+    const { message } = choice;
+    const { content } = message;
+    const assistantPrompt = content;
+    return assistantPrompt;
+  } catch (err: $TSFixMe) {
+    const reason = err?.message;
+    console.error({
+      message: "Failed to get application status.",
+      reason,
+    });
+    throw err;
+  }
+};
+
+export {
+  agent,
+  applicationStatusAgent,
+  connectOpenAI,
+  getChatMessages,
+  intializeChatMessages,
+};
