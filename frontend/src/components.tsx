@@ -2,7 +2,7 @@
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = "";
 
 const makeACallFetcher = async (
   _endpoint: string,

@@ -40,7 +40,7 @@ app.get("/callstatus", async (_, res) => {
 
 app.get("/applicationstatus", async (_, res) => {
   const applicationStatus =
-    (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "NA";
+    (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "";
   return res.json({ applicationStatus });
 });
 
