@@ -46,9 +46,21 @@ app.get("/applicationstatus", async (_, res) => {
 
 app.get("/transcription", (_, res) => {
   const chatMessages = getChatMessages();
-  const transcription = chatMessages.filter(
-    (message) => message.role === "user" || message.role === "assistant"
-  );
+  const transcription = chatMessages
+    .filter(
+      (message) => message.role === "user" || message.role === "assistant"
+    )
+    .map((message) => {
+      if (message.role === "user") return message;
+      const assistantMessageContent = message.content
+        ? JSON.parse(message.content)
+        : message.content;
+      const actualMessage = assistantMessageContent.content;
+      return {
+        ...message,
+        content: actualMessage,
+      };
+    });
   res.json({ transcription });
 });
 

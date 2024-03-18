@@ -117,42 +117,31 @@ export const MakeCall = () => {
 };
 
 export const FetchAndRenderTranscription = () => {
-  const { data, isLoading, isValidating } = useSWR(
-    "/transcription",
-    transcriptionFetcher,
-    {
-      refreshInterval: 1000,
-      revalidateIfStale: true,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-    }
-  );
-  const filteredData = data?.slice?.(1) || ([] as Array<unknown>);
+  const { data, isLoading } = useSWR("/transcription", transcriptionFetcher, {
+    refreshInterval: 3000,
+    revalidateIfStale: true,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
+  const transcription = data || [];
   return (
     <section>
       <h2 className="text-4xl font-bold">Transcription</h2>
-      {filteredData.length < 1 ? (
+      {transcription?.length < 1 ? (
         <p className="text-base leading-8 text-gray-500">
-          {isLoading || isValidating
+          {isLoading
             ? "Fetching Transcription."
             : "Will be available in a moment."}
         </p>
       ) : (
         <ul className="flex flex-col gap-4 max-h-[480px] overflow-y-scroll scroll-smooth border-2 p-4 leading-8">
-          {filteredData.map((item: Record<string, any>) => {
-            console.info({ item });
-            return (
-              <li>
-                <span className="font-semibold text-orange-500">
-                  {item.role}
-                </span>
-                :&nbsp;
-                <span className="leading-8">
-                  {item.content.content || item.content}
-                </span>
-              </li>
-            );
-          })}
+          {transcription.map((item: Record<string, any>) => (
+            <li>
+              <span className="font-semibold text-orange-500">{item.role}</span>
+              :&nbsp;
+              <span className="leading-8">{item.content}</span>
+            </li>
+          ))}
         </ul>
       )}
     </section>

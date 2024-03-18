@@ -191,7 +191,6 @@ const applicationStatusAgent = async () => {
           ? JSON.parse(message.content)
           : message.content;
         const actualMessage = assistantMessageContent.content;
-        console.log({ actualMessage });
         return {
           ...message,
           content: actualMessage,
