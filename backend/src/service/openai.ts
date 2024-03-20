@@ -123,6 +123,9 @@ const applicationStatusAgent = async () => {
     const completeion = await openaiClient.chat.completions.create({
       messages,
       model: MODELS.GPT4_1106_PREVIEW,
+      response_format: {
+        type: "json_object",
+      },
     });
     const [choice] = completeion.choices;
     const { message } = choice;

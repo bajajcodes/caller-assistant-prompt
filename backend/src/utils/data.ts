@@ -240,5 +240,4 @@ Politely decline survey invitations using the appropriate JSON response format. 
   "applicationStatus": "Complete or partial status update of the provider's application as obtained during the call."
 }
 
-To provide the context of your task I will share with you user and assistant chat history.
-Then your task is to provide me application status based on chat history shared with you.`;
+To provide the context of your task I will share with you user and assistant chat history.Then your task is to provide me application status based on chat history shared with you, adhering to the JSON format.`;

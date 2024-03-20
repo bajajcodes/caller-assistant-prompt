@@ -174,7 +174,6 @@ export const FetchAndRenderApplicationStatus = () => {
   const rawApplicationStatus = (data || mutationData)?.applicationStatus;
   const applicationStatus =
     data || mutationData ? (data || mutationData)?.applicationStatus : "--";
-  const content = data || mutationData ? (data || mutationData)?.content : "--";
   const isDataAvailable = Boolean(rawApplicationStatus);
   return (
     <div className="">
@@ -204,12 +203,6 @@ export const FetchAndRenderApplicationStatus = () => {
                 status:&nbsp;
               </span>
               <span className="leading-8">{applicationStatus}</span>
-            </p>
-            <p>
-              <span className="font-semibold text-orange-500">
-                content:&nbsp;
-              </span>
-              <span className="leading-8">{content}</span>
             </p>
           </div>
         </>
