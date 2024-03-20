@@ -37,8 +37,8 @@ const hangupCall = async (callSid: string) => {
       return;
     }
     const applicationStatus = await applicationStatusAgent();
-    console.info(`Application Status: ${applicationStatus || "NA"}`);
-    redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus || "NA");
+    console.info(`Application Status: ${applicationStatus || "--"}`);
+    redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus || "");
     console.info("Hangup Call Done.");
     return await twilioClient.calls(callSid).update({ status: "completed" });
   } catch (err: $TSFixMe) {

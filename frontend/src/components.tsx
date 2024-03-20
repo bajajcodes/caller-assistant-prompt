@@ -36,7 +36,7 @@ const getCallStatus = async () => {
 const getApplicationStatus = async () => {
   const response = await fetch(`${API_BASE_URL}/applicationstatus`);
   const data = await response.json();
-  return data.applicationStatus;
+  return { applicationStatus: data.applicationStatus, content: data.content };
 };
 
 function MakeACallForm({
@@ -171,8 +171,11 @@ export const FetchAndRenderApplicationStatus = () => {
     trigger,
     isMutating,
   } = useSWRMutation("/applicationstatus", getApplicationStatus);
-  const applicationStatus = data || mutationData || "--";
-  const isDataAvailable = Boolean(data || mutationData);
+  const rawApplicationStatus = (data || mutationData)?.applicationStatus;
+  const applicationStatus =
+    data || mutationData ? (data || mutationData)?.applicationStatus : "--";
+  const content = data || mutationData ? (data || mutationData)?.content : "--";
+  const isDataAvailable = Boolean(rawApplicationStatus);
   return (
     <div className="">
       <div className="flex gap-4 items-center justify-center">
@@ -201,6 +204,12 @@ export const FetchAndRenderApplicationStatus = () => {
                 status:&nbsp;
               </span>
               <span className="leading-8">{applicationStatus}</span>
+            </p>
+            <p>
+              <span className="font-semibold text-orange-500">
+                content:&nbsp;
+              </span>
+              <span className="leading-8">{content}</span>
             </p>
           </div>
         </>

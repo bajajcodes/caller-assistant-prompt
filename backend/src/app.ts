@@ -2,7 +2,7 @@ import cors from "cors";
 import type { Express } from "express";
 import express from "express";
 import {
-  getChatMessages,
+  getChatTranscription,
   intializeChatMessages,
   resetLLMModelTimer,
 } from "service/openai";
@@ -39,28 +39,23 @@ app.get("/callstatus", async (_, res) => {
 });
 
 app.get("/applicationstatus", async (_, res) => {
-  const applicationStatus =
-    (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "";
-  return res.json({ applicationStatus });
+  try {
+    const response = await redisClient.get(STORE_KEYS.APPLICATION_STATUS);
+    if (!response) return res.json({ applicationStatus: "", content: "" });
+    const data = JSON.parse(response);
+    const applicationStatus = data.applicationStatus;
+    const content = data.content;
+    return res.json({ applicationStatus, content });
+  } catch (err: $TSFixMe) {
+    console.error(
+      `Failed to send Applicaiton Status: ${err?.message || "Something Went Wrong"}`
+    );
+    return res.status(400).json({ applicationStatus: "", content: "" });
+  }
 });
 
 app.get("/transcription", (_, res) => {
-  const chatMessages = getChatMessages();
-  const transcription = chatMessages
-    .filter(
-      (message) => message.role === "user" || message.role === "assistant"
-    )
-    .map((message) => {
-      if (message.role === "user") return message;
-      const assistantMessageContent = message.content
-        ? JSON.parse(message.content)
-        : message.content;
-      const actualMessage = assistantMessageContent.content;
-      return {
-        ...message,
-        content: actualMessage,
-      };
-    });
+  const transcription = getChatTranscription();
   res.json({ transcription });
 });
 
@@ -123,11 +118,6 @@ app.post("/callupdate", async (req, res) => {
     "for Call SID:",
     req.body.CallSid
   );
-  // const call = await redisClient.hGetAll(req.body.callSid);
-  // await redisClient.hSet(call.callSid, {
-  //   ...call,
-  //   callStatus: req.body.CallStatus,
-  // });
   redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
   return res.status(200).send();
 });
