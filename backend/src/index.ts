@@ -107,6 +107,8 @@ const startProcessingAssistantMessages = async () => {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
+      const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
+      console.info({ callStatus });
       if (callSid && assistantMessages.length > 0) {
         const message = assistantMessages.shift();
         if (!message || !message.content) {
