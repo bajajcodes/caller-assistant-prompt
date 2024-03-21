@@ -5,7 +5,7 @@ import { ResponseType } from "types/openai";
 import { STORE_KEYS } from "types/redis";
 import { AssistantResponse } from "../types/openai";
 import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "../utils/config";
-import { applicationStatusAgent, getChatTranscription } from "./openai";
+import { applicationStatusAgent } from "./openai";
 import { redisClient } from "./redis";
 
 let twilioClient: Twilio;
@@ -33,12 +33,6 @@ const hangupCall = async (callSid?: string | null) => {
     if (!callSid) {
       console.info(
         `Cannot hangup call, Because CallSid: ${callSid} does not exists.`
-      );
-      return;
-    }
-    if (getChatTranscription().length < 1) {
-      console.info(
-        `Cannot hangup call, Because Already Hanguped or Call Not Initiated.`
       );
       return;
     }

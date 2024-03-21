@@ -1,6 +1,5 @@
 import "./App.css";
 import {
-  FetchAndRenderApplicationStatus,
   FetchAndRenderCallStatus,
   FetchAndRenderTranscription,
   HangupAndRestCall,
@@ -16,7 +15,7 @@ function App() {
         <FetchAndRenderCallStatus />
       </div>
       <div>
-        <FetchAndRenderApplicationStatus />
+        {/* <FetchAndRenderApplicationStatus /> */}
         <FetchAndRenderTranscription />
       </div>
     </main>
