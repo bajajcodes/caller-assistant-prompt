@@ -49,6 +49,10 @@ const intializeChatMessages = (providerData: string) => {
 
 const getChatMessages = () => chatMessages;
 const getChatTranscription = () => chatTranscription;
+const resetChatMessagesAndTranscription = () => {
+  chatMessages = [];
+  chatTranscription = [];
+};
 
 const connectOpenAI = async () => {
   try {
@@ -148,4 +152,5 @@ export {
   getChatMessages,
   getChatTranscription,
   intializeChatMessages,
+  resetChatMessagesAndTranscription,
 };

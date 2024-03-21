@@ -4,6 +4,26 @@ import useSWRMutation from "swr/mutation";
 
 const API_BASE_URL = "";
 
+const resetCallContext = async () => {
+  const response = await fetch(`${API_BASE_URL}/reset`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return await response.json();
+};
+
+const hangupCall = async () => {
+  const response = await fetch(`${API_BASE_URL}/hangup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return await response.json();
+};
+
 const makeACallFetcher = async (
   _endpoint: string,
   { arg }: { arg: { twilioCallToNumber: string; providerData: string } }
@@ -242,6 +262,37 @@ export const FetchAndRenderCallStatus = () => {
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+export const HangupAndRestCall = () => {
+  const { trigger: reset } = useSWRMutation("/reset", resetCallContext);
+  const { trigger: hangup } = useSWRMutation("/hangup", hangupCall);
+  return (
+    <div className="flex flex-col gap-4">
+      <button
+        onClick={() => {
+          reset();
+          window.alert(
+            "Call Info Reset Done. Please wait for 5-10 seconds to get UI refreshed."
+          );
+        }}
+        className="bg-orange-500 hover:bg-orange-500/90 text-white py-2 px-4 max-w-32 mx-auto w-full"
+      >
+        Reset Call
+      </button>
+      <button
+        onClick={() => {
+          hangup();
+          window.alert(
+            "Call Hangup Done. Please wait for 5-10 seconds to get UI refreshed."
+          );
+        }}
+        className="bg-red-500 hover:bg-red-500/90 text-white py-2 px-4 max-w-32 mx-auto w-full"
+      >
+        Hangup Call
+      </button>
     </div>
   );
 };

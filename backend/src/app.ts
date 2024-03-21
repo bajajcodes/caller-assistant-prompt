@@ -4,10 +4,11 @@ import express from "express";
 import {
   getChatTranscription,
   intializeChatMessages,
+  resetChatMessagesAndTranscription,
   resetLLMModelTimer,
 } from "service/openai";
 import { redisClient } from "service/redis";
-import { twilioClient } from "service/twilio";
+import { hangupCall, twilioClient } from "service/twilio";
 import twillio from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
@@ -57,6 +58,32 @@ app.get("/applicationstatus", async (_, res) => {
 app.get("/transcription", (_, res) => {
   const transcription = getChatTranscription();
   res.json({ transcription });
+});
+
+app.post("/reset", (_, res) => {
+  resetLLMModelTimer();
+  resetChatMessagesAndTranscription();
+  redisClient.set(STORE_KEYS.CALL_SID, "");
+  redisClient.set(STORE_KEYS.PROVIDER_DATA, "");
+  redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
+  redisClient.set(STORE_KEYS.CALL_STATUS, "");
+  return res.json({ done: true });
+});
+
+app.post("/hangup", async (_, res) => {
+  const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
+  if (callSid) {
+    await hangupCall(callSid);
+    return res.json({ done: true });
+  }
+  // resetLLMModelTimer();
+  // resetChatMessagesAndTranscription();
+  // redisClient.set(STORE_KEYS.CALL_SID, "");
+  // redisClient.set(STORE_KEYS.PROVIDER_DATA, "");
+  // redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
+  // redisClient.set(STORE_KEYS.CALL_STATUS, "");
+  // redisClient.set(STORE_KEYS.CALL_HANGUP, "false");
+  return res.json({ done: false });
 });
 
 app.post("/makeacall", async (req, res) => {
