@@ -193,7 +193,8 @@ export const FetchAndRenderApplicationStatus = () => {
   } = useSWRMutation("/applicationstatus", getApplicationStatus);
   const rawApplicationStatus = (data || mutationData)?.applicationStatus;
   const applicationStatus =
-    data || mutationData ? (data || mutationData)?.applicationStatus : "--";
+    data || mutationData ? (data || mutationData)?.applicationStatus : "";
+  const content = data || mutationData ? (data || mutationData)?.content : "";
   const isDataAvailable = Boolean(rawApplicationStatus);
   return (
     <div className="">
@@ -222,7 +223,9 @@ export const FetchAndRenderApplicationStatus = () => {
               <span className="font-semibold text-orange-500">
                 status:&nbsp;
               </span>
-              <span className="leading-8">{applicationStatus}</span>
+              <span className="leading-8">
+                {JSON.stringify(applicationStatus || content || "--")}
+              </span>
             </p>
           </div>
         </>
