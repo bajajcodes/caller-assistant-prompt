@@ -67,14 +67,12 @@ app.post("/reset", (_, res) => {
   redisClient.set(STORE_KEYS.PROVIDER_DATA, "");
   redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
   redisClient.set(STORE_KEYS.CALL_STATUS, "");
-  redisClient.set(STORE_KEYS.CALL_COMPLETED, "false");
   return res.json({ done: true });
 });
 
 app.post("/hangup", async (_, res) => {
   const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
   if (callSid) {
-    redisClient.set(STORE_KEYS.CALL_COMPLETED, "true");
     await hangupCall(callSid);
     return res.json({ done: true });
   }
@@ -118,7 +116,6 @@ app.post("/makeacall", async (req, res) => {
     redisClient.set(STORE_KEYS.PROVIDER_DATA, providerDataStringified);
     redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
     redisClient.set(STORE_KEYS.CALL_STATUS, "");
-    redisClient.set(STORE_KEYS.CALL_COMPLETED, "false");
     console.info(`Call initiated with SID: ${call.sid}`);
     res.json({
       message: `Call initiated with SID: ${call.sid}`,

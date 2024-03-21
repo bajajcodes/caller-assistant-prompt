@@ -4,7 +4,7 @@ import { createServer } from "http";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
 import { connectRedis, redisClient } from "service/redis";
-import { connectTwilio, updateInProgessCall } from "service/twilio";
+import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
 import { STORE_KEYS } from "types/redis";
@@ -107,11 +107,11 @@ const startProcessingAssistantMessages = async () => {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
-      // const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
-      // console.info({ callStatus });
-      // if (callStatus === "completed") {
-      //   return await hangupCall(callSid);
-      // }
+      const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
+      console.info({ callStatus });
+      if (callStatus === "completed") {
+        return await hangupCall(callSid);
+      }
 
       if (callSid && assistantMessages.length > 0) {
         const message = assistantMessages.shift();
