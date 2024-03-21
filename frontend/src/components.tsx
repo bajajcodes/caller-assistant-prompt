@@ -192,10 +192,11 @@ export const FetchAndRenderApplicationStatus = () => {
     isMutating,
   } = useSWRMutation("/applicationstatus", getApplicationStatus);
   const rawApplicationStatus = (data || mutationData)?.applicationStatus;
+  const rawContent = (data || mutationData)?.content;
   const applicationStatus =
     data || mutationData ? (data || mutationData)?.applicationStatus : "";
   const content = data || mutationData ? (data || mutationData)?.content : "";
-  const isDataAvailable = Boolean(rawApplicationStatus);
+  const isDataAvailable = Boolean(rawApplicationStatus) || Boolean(rawContent);
   return (
     <div className="">
       <div className="flex gap-4 items-center justify-center">

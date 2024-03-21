@@ -14,7 +14,7 @@ import app from "./app";
 
 let transcriptCollection: Array<string> = [];
 const assistantMessages: Array<AssistantResponse> = [];
-const messageQueue = new EventEmitter();
+export const messageQueue = new EventEmitter();
 const port = PORT || 3000;
 
 const enqueueAssistantMessage = (assitantResponse: AssistantResponse) => {
@@ -107,8 +107,12 @@ const startProcessingAssistantMessages = async () => {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
-      const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
-      console.info({ callStatus });
+      // const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
+      // console.info({ callStatus });
+      // if (callStatus === "completed") {
+      //   return await hangupCall(callSid);
+      // }
+
       if (callSid && assistantMessages.length > 0) {
         const message = assistantMessages.shift();
         if (!message || !message.content) {

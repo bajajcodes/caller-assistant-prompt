@@ -67,22 +67,17 @@ app.post("/reset", (_, res) => {
   redisClient.set(STORE_KEYS.PROVIDER_DATA, "");
   redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
   redisClient.set(STORE_KEYS.CALL_STATUS, "");
+  redisClient.set(STORE_KEYS.CALL_COMPLETED, "false");
   return res.json({ done: true });
 });
 
 app.post("/hangup", async (_, res) => {
   const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
   if (callSid) {
+    redisClient.set(STORE_KEYS.CALL_COMPLETED, "true");
     await hangupCall(callSid);
     return res.json({ done: true });
   }
-  // resetLLMModelTimer();
-  // resetChatMessagesAndTranscription();
-  // redisClient.set(STORE_KEYS.CALL_SID, "");
-  // redisClient.set(STORE_KEYS.PROVIDER_DATA, "");
-  // redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
-  // redisClient.set(STORE_KEYS.CALL_STATUS, "");
-  // redisClient.set(STORE_KEYS.CALL_HANGUP, "false");
   return res.json({ done: false });
 });
 
@@ -123,6 +118,7 @@ app.post("/makeacall", async (req, res) => {
     redisClient.set(STORE_KEYS.PROVIDER_DATA, providerDataStringified);
     redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
     redisClient.set(STORE_KEYS.CALL_STATUS, "");
+    redisClient.set(STORE_KEYS.CALL_COMPLETED, "false");
     console.info(`Call initiated with SID: ${call.sid}`);
     res.json({
       message: `Call initiated with SID: ${call.sid}`,
@@ -146,6 +142,9 @@ app.post("/callupdate", async (req, res) => {
     req.body.CallSid
   );
   redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
+  if (req.body.CallStatus === "completed") {
+    hangupCall(req.body.CallSid);
+  }
   return res.status(200).send();
 });
 

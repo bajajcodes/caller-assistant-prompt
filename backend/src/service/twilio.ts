@@ -28,22 +28,30 @@ const connectTwilio = () => {
   }
 };
 
-const hangupCall = async (callSid: string) => {
+const hangupCall = async (callSid?: string | null) => {
   try {
+    const callCompleted = await redisClient.get(STORE_KEYS.CALL_COMPLETED);
+    if (callCompleted === "true") {
+      console.info(`Call Already Finshed. Cannot hangup Call.`);
+      return;
+    }
     if (!callSid) {
       console.info(
         `Cannot hangup call, Because CallSid: ${callSid} does not exists.`
       );
       return;
     }
+    console.info("Calling GET: application status");
     const applicationStatus = await applicationStatusAgent();
     console.info(`Application Status: ${applicationStatus || "--"}`);
     redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus || "");
+    redisClient.set(STORE_KEYS.CALL_COMPLETED, "true");
     console.info("Hangup Call Done.");
     return await twilioClient.calls(callSid).update({ status: "completed" });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
     console.error({ message: "Failed to Hangup Call", reason });
+    redisClient.set(STORE_KEYS.CALL_COMPLETED, "false");
     throw err;
   }
 };
