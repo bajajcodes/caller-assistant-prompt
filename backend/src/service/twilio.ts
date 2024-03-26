@@ -1,12 +1,16 @@
 import twillio, { Twilio } from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { activeCallSidCollection, enqueueActiveCalls } from "index";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
-import { STORE_KEYS } from "types/redis";
 import { AssistantResponse } from "../types/openai";
-import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "../utils/config";
-import { applicationStatusAgent } from "./openai";
-import { redisClient } from "./redis";
+import {
+  HOST,
+  TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN,
+  TWILIO_FROM_NUMBER,
+} from "../utils/config";
+import { intializeChatMessagesForACall } from "./openai";
 
 let twilioClient: Twilio;
 const VoiceResponse = twillio.twiml.VoiceResponse;
@@ -36,12 +40,8 @@ const hangupCall = async (callSid?: string | null) => {
       );
       return;
     }
-    console.info("Calling GET: application status");
-    const applicationStatus = await applicationStatusAgent();
-    console.info(`Application Status: ${applicationStatus || "--"}`);
-    redisClient.set(STORE_KEYS.APPLICATION_STATUS, applicationStatus || "");
+    await twilioClient.calls(callSid).update({ status: "completed" });
     console.info("Hangup Call Done.");
-    return await twilioClient.calls(callSid).update({ status: "completed" });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
     console.error({ message: "Failed to Hangup Call", reason });
@@ -61,7 +61,6 @@ const updateInProgessCall = async (
     if (responseType === ResponseType.END_CALL) {
       return await hangupCall(callSid);
     }
-    const host = await redisClient.get(STORE_KEYS.HOST);
     const response = new VoiceResponse();
     if (responseType === ResponseType.SAY_FOR_VOICE) {
       response.say(content);
@@ -77,14 +76,14 @@ const updateInProgessCall = async (
     }
     const connect = response.connect();
     connect.stream({
-      url: `wss://${host}`,
+      url: `wss://${HOST}`,
       track: "inbound_track",
     });
     response.pause({
       length: 120,
     });
     const twiml = response.toString();
-    return await twilioClient.calls(callSid).update({
+    await twilioClient.calls(callSid).update({
       twiml,
     });
   } catch (err: $TSFixMe) {
@@ -104,4 +103,66 @@ const updateInProgessCall = async (
   }
 };
 
-export { connectTwilio, hangupCall, twilioClient, updateInProgessCall };
+const makeacall = async ({
+  twilioCallToNumber,
+  providerData,
+}: {
+  twilioCallToNumber: string;
+  providerData: Record<string, string>;
+}): Promise<void> => {
+  try {
+    if (!HOST) {
+      throw Error("Host Address is Missing");
+    }
+    if (!TWILIO_FROM_NUMBER) {
+      throw Error("Twillio Call From Number is Missing");
+    }
+    const response = new VoiceResponse();
+    const connect = response.connect();
+    response.say("");
+    connect.stream({
+      url: `wss://${HOST}`,
+      track: "inbound_track",
+    });
+    response.pause({
+      length: 120,
+    });
+    const twiml = response.toString();
+    const call = await twilioClient.calls.create({
+      twiml,
+      to: twilioCallToNumber,
+      from: TWILIO_FROM_NUMBER,
+      record: true,
+      statusCallback: `https://${HOST}/callupdate`,
+      statusCallbackMethod: "POST",
+      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+    });
+    enqueueActiveCalls({
+      callSid: call.sid,
+      chatMessages: intializeChatMessagesForACall(providerData),
+      callToNumber: twilioCallToNumber,
+    });
+    activeCallSidCollection.push(call.sid);
+  } catch (err: $TSFixMe) {
+    console.error({ err });
+  }
+};
+
+const makeCallsInBatch = async (batch: Array<$TSFixMe>) => {
+  try {
+    batch.forEach((item) =>
+      makeacall({ twilioCallToNumber: item.phoneNumber, providerData: item })
+    );
+  } catch (err: $TSFixMe) {
+    console.error({ err });
+  }
+};
+
+export {
+  connectTwilio,
+  hangupCall,
+  makeCallsInBatch,
+  makeacall,
+  twilioClient,
+  updateInProgessCall,
+};
