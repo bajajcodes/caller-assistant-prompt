@@ -1,6 +1,6 @@
 import twillio, { Twilio } from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { activeCallSidCollection, enqueueActiveCalls } from "index";
+import { dequeueActiveCall, enqueueActiveCalls } from "index";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { AssistantResponse } from "../types/openai";
@@ -41,6 +41,7 @@ const hangupCall = async (callSid?: string | null) => {
       return;
     }
     await twilioClient.calls(callSid).update({ status: "completed" });
+    dequeueActiveCall(callSid);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
@@ -103,19 +104,19 @@ const updateInProgessCall = async (
   }
 };
 
-const makeacall = async ({
-  twilioCallToNumber,
-  providerData,
-}: {
-  twilioCallToNumber: string;
-  providerData: Record<string, string>;
-}): Promise<void> => {
+const makeacall = async (
+  providerData: Record<string, string>
+): Promise<void> => {
   try {
+    const twilioCallToNumber = providerData.phoneNumber;
     if (!HOST) {
       throw Error("Host Address is Missing");
     }
     if (!TWILIO_FROM_NUMBER) {
-      throw Error("Twillio Call From Number is Missing");
+      throw Error("Call From Number is Missing");
+    }
+    if (!twilioCallToNumber) {
+      throw Error("Call To Number is Missing");
     }
     const response = new VoiceResponse();
     const connect = response.connect();
@@ -142,7 +143,6 @@ const makeacall = async ({
       chatMessages: intializeChatMessagesForACall(providerData),
       callToNumber: twilioCallToNumber,
     });
-    activeCallSidCollection.push(call.sid);
   } catch (err: $TSFixMe) {
     console.error({ err });
   }
@@ -150,9 +150,10 @@ const makeacall = async ({
 
 const makeCallsInBatch = async (batch: Array<$TSFixMe>) => {
   try {
-    batch.forEach((item) =>
-      makeacall({ twilioCallToNumber: item.phoneNumber, providerData: item })
-    );
+    const promises: Array<unknown> = [];
+    batch.forEach((item) => promises.push(makeacall(item)));
+    //INFO: if fails to make even a single call discard all
+    await Promise.all(promises);
   } catch (err: $TSFixMe) {
     console.error({ err });
   }

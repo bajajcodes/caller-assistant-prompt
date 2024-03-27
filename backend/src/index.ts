@@ -1,4 +1,8 @@
-import { LiveClient, LiveTranscriptionEvents } from "@deepgram/sdk";
+import {
+  LiveClient,
+  LiveTranscriptionEvent,
+  LiveTranscriptionEvents,
+} from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
@@ -12,7 +16,6 @@ import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
 
-let transcriptCollection: Array<string> = [];
 const assistantMessages: Array<{
   response: AssistantResponse;
   callSid: string;
@@ -23,8 +26,7 @@ const activeCalls: Array<{
   chatMessages: Array<ChatCompletionMessageParam>;
 }> = [];
 export const messageQueue = new EventEmitter();
-export const activeStreamSidMap: Record<string, string> = {};
-export const activeCallSidCollection: Array<string> = [];
+const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const port = PORT || 3000;
 
 const enqueueAssistantMessage = (
@@ -43,22 +45,14 @@ export const enqueueActiveCalls = (call: {
   activeCalls.push(call);
 };
 
-// export const updateActiveCallStreamSid = ({
-//   callSid,
-//   streamSid,
-// }: {
-//   streamSid?: string;
-//   callSid: string;
-// }) => {
-//   const index = activeCalls.findIndex((e) => e.callSid === callSid);
-//   activeCalls[index].streamSid = streamSid;
-// };
+export const dequeueActiveCall = (callSid: string) => {
+  const index = activeCalls.findIndex((call) => call.callSid === callSid);
+  if (index === -1) return;
+  activeCalls.splice(index, 1);
+};
 
 export const getActiveCallChatMessages = (callSid: string) =>
   activeCalls.find((call) => call.callSid === callSid)?.chatMessages;
-
-export const getActiveCallSid = (streamSid: string) =>
-  activeStreamSidMap[streamSid];
 
 const startServer = async () => {
   try {
@@ -75,9 +69,13 @@ const startServer = async () => {
         encoding: "mulaw",
         sample_rate: 8000,
         channels: 1,
+        punctuate: true,
+        endpointing: 25,
+        // interim_results: true,
+        // utterance_end_ms: 1000,
       });
       let messageQueue: Array<Buffer> = [];
-      // let deepgramReady = false;
+      let transcriptCollection: Array<string> = [];
 
       ws.on("message", (data: $TSFixMe) => {
         const twilioMessage = JSON.parse(data);
@@ -93,27 +91,9 @@ const startServer = async () => {
           const streamSid = twilioMessage.streamSid;
           const callSid = twilioMessage.start.callSid;
           ws.streamSid = streamSid;
-          console.info(`Starting Media Stream ${streamSid}`);
-          if (!activeStreamSidMap[streamSid]) {
-            if (!activeCallSidCollection.includes(callSid)) {
-              activeCalls.push({
-                callSid: callSid,
-                chatMessages: [],
-                callToNumber: twilioMessage.start.customParameters.number,
-              });
-              activeCallSidCollection.push(callSid);
-            }
-            activeStreamSidMap[streamSid] = callSid;
-          }
+          ws.callSid = callSid;
+          console.info(`Starting Media Stream ${streamSid} for ${callSid}`);
           console.info(`There are ${activeCalls.length} active calls`);
-        }
-
-        if (event === "stop") {
-          console.info("Media Stream has Ended.");
-          console.info({
-            streamSid: twilioMessage.streamSid,
-            callSid: twilioMessage.stop.callSid,
-          });
         }
 
         if (event === "media") {
@@ -123,6 +103,8 @@ const startServer = async () => {
             const audio = Buffer.from(media["payload"], "base64");
             deepgramConnection.send(audio);
           } else {
+            //INFO: messagequeue packets are dropped
+            //TODO: use dropped audio packets
             messageQueue.push(data);
           }
         }
@@ -146,34 +128,57 @@ const startServer = async () => {
       deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
         console.info("Deepgram connection is ready and opened.");
         console.info(
-          `Message Queue has total of ${messageQueue.length} messages`
+          `Message Queue has lost total of ${messageQueue.length} messages`
         );
-        // deepgramReady = true;
-        messageQueue.forEach((msg) => {
-          ws.emit("message", msg);
-        });
-        messageQueue = [];
+        if (messageQueue.length > 0) {
+          // messageQueue.forEach((msg) => {
+          //   ws.emit("message", msg);
+          // });
+          messageQueue = [];
+        }
         deepgramConnection.on(
           LiveTranscriptionEvents.Transcript,
-          async (transcription) => {
+          async (transcription: LiveTranscriptionEvent) => {
             const transcript = transcription.channel.alternatives[0].transcript;
+            console.info({
+              start: transcription.start,
+              duration: transcription.duration,
+              // type: transcription.type,
+              speech_final: transcription.speech_final,
+              is_final: transcription.is_final,
+              callSid: ws.callSid,
+              // channel_index: transcription.channel_index,
+              transcript,
+            });
 
-            if (transcript) {
-              transcriptCollection.push(transcript);
-            }
-            console.info({ transcript });
-            if (transcriptCollection.length < 1 || transcript) {
+            if (!transcript) {
               return;
             }
 
+            if (transcript && !transcription.speech_final) {
+              transcriptCollection.push(transcript);
+              return;
+            }
+
+            if (
+              transcript &&
+              transcription.speech_final &&
+              !PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
+            ) {
+              transcriptCollection.push(transcript);
+              return;
+            }
+
+            transcriptCollection.push(transcript);
             const userInput = transcriptCollection.join("");
             transcriptCollection = [];
-            console.info({ userInput });
-            agent(
+            console.info({
+              transcript,
               userInput,
-              activeStreamSidMap[ws.streamSid],
-              enqueueAssistantMessage
-            );
+              callSid: ws.callSid,
+            });
+            //TODO: add more strong check of no overallp for streamSid and callSid
+            agent(userInput, ws.callSid, enqueueAssistantMessage);
           }
         );
 
@@ -204,7 +209,7 @@ const startProcessingAssistantMessages = async () => {
           console.error("Call Sid is Missing.");
           return;
         }
-        await updateInProgessCall(callSid, message.response);
+        updateInProgessCall(callSid, message.response);
       } else {
         await new Promise((resolve) =>
           messageQueue.once("new_message", resolve)
