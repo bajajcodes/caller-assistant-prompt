@@ -1,9 +1,14 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { getChatMessages, intializeChatMessages } from "service/openai";
+import {
+  getChatTranscription,
+  intializeChatMessages,
+  resetChatMessagesAndTranscription,
+  resetLLMModelTimer,
+} from "service/openai";
 import { redisClient } from "service/redis";
-import { twilioClient } from "service/twilio";
+import { hangupCall, twilioClient } from "service/twilio";
 import twillio from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
@@ -35,17 +40,43 @@ app.get("/callstatus", async (_, res) => {
 });
 
 app.get("/applicationstatus", async (_, res) => {
-  const applicationStatus =
-    (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "NA";
-  return res.json({ applicationStatus });
+  try {
+    const response = await redisClient.get(STORE_KEYS.APPLICATION_STATUS);
+    if (!response) return res.json({ applicationStatus: "", content: "" });
+    const data = JSON.parse(response);
+    const applicationStatus = data.applicationStatus;
+    const content = data.content;
+    return res.json({ applicationStatus, content });
+  } catch (err: $TSFixMe) {
+    console.error(
+      `Failed to send Applicaiton Status: ${err?.message || "Something Went Wrong"}`
+    );
+    return res.status(400).json({ applicationStatus: "", content: "" });
+  }
 });
 
 app.get("/transcription", (_, res) => {
-  const chatMessages = getChatMessages();
-  const transcription = chatMessages.filter(
-    (message) => message.role === "user" || message.role === "assistant"
-  );
+  const transcription = getChatTranscription();
   res.json({ transcription });
+});
+
+app.post("/reset", (_, res) => {
+  resetLLMModelTimer();
+  resetChatMessagesAndTranscription();
+  redisClient.set(STORE_KEYS.CALL_SID, "");
+  redisClient.set(STORE_KEYS.PROVIDER_DATA, "");
+  redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
+  redisClient.set(STORE_KEYS.CALL_STATUS, "");
+  return res.json({ done: true });
+});
+
+app.post("/hangup", async (_, res) => {
+  const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
+  if (callSid) {
+    await hangupCall(callSid);
+    return res.json({ done: true });
+  }
+  return res.json({ done: false });
 });
 
 app.post("/makeacall", async (req, res) => {
@@ -68,6 +99,7 @@ app.post("/makeacall", async (req, res) => {
     response.pause({
       length: 120,
     });
+    const providerDataStringified = JSON.stringify(providerData);
     const twiml = response.toString();
     const call = await twilioClient.calls.create({
       twiml,
@@ -78,17 +110,12 @@ app.post("/makeacall", async (req, res) => {
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     });
-    // await redisClient.hSet(call.sid, {
-    //   providerData,
-    //   callSid: call.sid,
-    //   callStatus: "",
-    //   applicationStatus: "",
-    // });
+    resetLLMModelTimer();
+    intializeChatMessages(providerDataStringified);
     redisClient.set(STORE_KEYS.CALL_SID, call.sid);
-    redisClient.set(STORE_KEYS.PROVIDER_DATA, providerData);
-    redisClient.set(STORE_KEYS.APPLICATION_STATUS, "NA");
+    redisClient.set(STORE_KEYS.PROVIDER_DATA, providerDataStringified);
+    redisClient.set(STORE_KEYS.APPLICATION_STATUS, "");
     redisClient.set(STORE_KEYS.CALL_STATUS, "");
-    intializeChatMessages(providerData);
     console.info(`Call initiated with SID: ${call.sid}`);
     res.json({
       message: `Call initiated with SID: ${call.sid}`,
@@ -111,12 +138,10 @@ app.post("/callupdate", async (req, res) => {
     "for Call SID:",
     req.body.CallSid
   );
-  // const call = await redisClient.hGetAll(req.body.callSid);
-  // await redisClient.hSet(call.callSid, {
-  //   ...call,
-  //   callStatus: req.body.CallStatus,
-  // });
   redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
+  if (req.body.CallStatus === "completed") {
+    hangupCall(req.body.CallSid);
+  }
   return res.status(200).send();
 });
 
