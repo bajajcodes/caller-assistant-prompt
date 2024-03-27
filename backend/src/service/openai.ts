@@ -1,11 +1,15 @@
-import { getActiveCallChatMessages } from "index";
 import OpenAI from "openai";
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import {
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionSystemMessageParam,
+  ChatCompletionUserMessageParam,
+} from "openai/resources/index.mjs";
 import { AssistantResponse, MODELS } from "types/openai";
 import { systemPromptCollection } from "utils/data";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { $TSFixMe } from "../types/common";
 import { LLM_MODEL_SWITCH_DURATION, OPEN_AI_KEY } from "../utils/config";
+import { getConversationHistory, storeMessage } from "./redis";
 
 const timeout = LLM_MODEL_SWITCH_DURATION
   ? parseInt(LLM_MODEL_SWITCH_DURATION, 10)
@@ -33,11 +37,10 @@ export const resetLLMModelTimer = () => {
   console.info("Switch LLM Model Timer Started.");
 };
 
-const intializeChatMessagesForACall = (
+const getSystemRoleMessage = (
   providerData: Record<string, string>
-) => {
+): ChatCompletionSystemMessageParam => {
   const providerDataStringified = JSON.stringify(providerData);
-  const chatMessages: Array<ChatCompletionMessageParam> = [];
   const data = {
     label: "Data Presentation or Data",
     instruction: providerDataStringified.replaceAll("\t", " "),
@@ -46,8 +49,7 @@ const intializeChatMessagesForACall = (
     (prompt, item) => `${prompt} ${item.label}:${item.instruction} `,
     ""
   );
-  chatMessages.push({ role: "system", content });
-  return chatMessages;
+  return { role: "system", content };
 };
 
 const connectOpenAI = async () => {
@@ -71,10 +73,14 @@ const agent = async (
 ): Promise<void> => {
   try {
     if (!callSid) throw Error(`CallSid: ${callSid} is Missing.`);
-    const chatMessages = getActiveCallChatMessages(callSid);
-    if (!chatMessages)
+    const chatMessages = await getConversationHistory(callSid);
+    if (!chatMessages || chatMessages.length < 1)
       throw Error(`Chat Messages for CallSid: ${callSid} are Missing.`);
-    chatMessages.push({ role: "user", content: userInput });
+    const userRoleMessage: ChatCompletionUserMessageParam = {
+      role: "user",
+      content: userInput,
+    };
+    chatMessages.push(userRoleMessage);
     const completeion = await openaiClient.chat.completions.create({
       messages: chatMessages,
       model: LLM_MODEL,
@@ -91,9 +97,14 @@ const agent = async (
 
     if (!assistantPrompt) return;
     const assistantResponse = JSON.parse(assistantPrompt) as AssistantResponse;
-    chatMessages.push({ role: "assistant", content: assistantPrompt });
+    const assistantRoleMessage: ChatCompletionAssistantMessageParam = {
+      role: "assistant",
+      content: assistantPrompt,
+    };
+    await storeMessage(callSid, userRoleMessage);
+    await storeMessage(callSid, assistantRoleMessage);
     console.info(
-      `CallSid: ${callSid} Chat Messages length is ${chatMessages.length}`
+      `CallSid: ${callSid} Chat Messages length is ${chatMessages.length + 1}`
     );
     onUpdate(assistantResponse, callSid);
   } catch (err: $TSFixMe) {
@@ -106,4 +117,4 @@ const agent = async (
   }
 };
 
-export { agent, connectOpenAI, intializeChatMessagesForACall };
+export { agent, connectOpenAI, getSystemRoleMessage };

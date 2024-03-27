@@ -5,10 +5,9 @@ import {
 } from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
-import { connectRedis } from "service/redis";
+import { connectRedis, getCurrentActiveCallCount } from "service/redis";
 import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
@@ -19,11 +18,6 @@ import app from "./app";
 const assistantMessages: Array<{
   response: AssistantResponse;
   callSid: string;
-}> = [];
-const activeCalls: Array<{
-  callToNumber: string;
-  callSid: string;
-  chatMessages: Array<ChatCompletionMessageParam>;
 }> = [];
 export const messageQueue = new EventEmitter();
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
@@ -36,23 +30,6 @@ const enqueueAssistantMessage = (
   assistantMessages.push({ response: assitantResponse, callSid });
   messageQueue.emit("new_message");
 };
-
-export const enqueueActiveCalls = (call: {
-  callToNumber: string;
-  callSid: string;
-  chatMessages: Array<ChatCompletionMessageParam>;
-}) => {
-  activeCalls.push(call);
-};
-
-export const dequeueActiveCall = (callSid: string) => {
-  const index = activeCalls.findIndex((call) => call.callSid === callSid);
-  if (index === -1) return;
-  activeCalls.splice(index, 1);
-};
-
-export const getActiveCallChatMessages = (callSid: string) =>
-  activeCalls.find((call) => call.callSid === callSid)?.chatMessages;
 
 const startServer = async () => {
   try {
@@ -70,7 +47,7 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        endpointing: 25,
+        endpointing: 50,
         // interim_results: true,
         // utterance_end_ms: 1000,
       });
@@ -90,10 +67,10 @@ const startServer = async () => {
         if (event === "start") {
           const streamSid = twilioMessage.streamSid;
           const callSid = twilioMessage.start.callSid;
-          ws.streamSid = streamSid;
+          //TODO: add streamSid to callSid map
           ws.callSid = callSid;
           console.info(`Starting Media Stream ${streamSid} for ${callSid}`);
-          console.info(`There are ${activeCalls.length} active calls`);
+          console.info(`There are ${getCurrentActiveCallCount()} active calls`);
         }
 
         if (event === "media") {

@@ -1,6 +1,5 @@
 import twillio, { Twilio } from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { dequeueActiveCall, enqueueActiveCalls } from "index";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { AssistantResponse } from "../types/openai";
@@ -10,7 +9,12 @@ import {
   TWILIO_AUTH_TOKEN,
   TWILIO_FROM_NUMBER,
 } from "../utils/config";
-import { intializeChatMessagesForACall } from "./openai";
+import { getSystemRoleMessage } from "./openai";
+import {
+  incrementActiveCallCount,
+  removeConversationHistory,
+  storeMessage,
+} from "./redis";
 
 let twilioClient: Twilio;
 const VoiceResponse = twillio.twiml.VoiceResponse;
@@ -41,7 +45,7 @@ const hangupCall = async (callSid?: string | null) => {
       return;
     }
     await twilioClient.calls(callSid).update({ status: "completed" });
-    dequeueActiveCall(callSid);
+    await removeConversationHistory(callSid);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
@@ -118,6 +122,7 @@ const makeacall = async (
     if (!twilioCallToNumber) {
       throw Error("Call To Number is Missing");
     }
+    const systemRoleMessage = getSystemRoleMessage(providerData);
     const response = new VoiceResponse();
     const connect = response.connect();
     response.say("");
@@ -138,11 +143,8 @@ const makeacall = async (
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     });
-    enqueueActiveCalls({
-      callSid: call.sid,
-      chatMessages: intializeChatMessagesForACall(providerData),
-      callToNumber: twilioCallToNumber,
-    });
+    await storeMessage(call.sid, systemRoleMessage);
+    incrementActiveCallCount();
   } catch (err: $TSFixMe) {
     console.error({ err });
   }

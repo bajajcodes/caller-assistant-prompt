@@ -1,10 +1,9 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { redisClient } from "service/redis";
+import { storeHost } from "service/redis";
 import { makeCallsInBatch } from "service/twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { STORE_KEYS } from "types/redis";
 
 const app: Express = express();
 
@@ -18,7 +17,8 @@ app.use(async (req, _, next) => {
   const wsProtocol = protocol === "https" ? "wss" : "ws";
   req.headers.protocol = protocol;
   req.headers.wsProtocol = wsProtocol;
-  await redisClient.set(STORE_KEYS.HOST, req.headers.host!);
+  //TODO: remove not null assertion
+  await storeHost(req.headers.host!);
   next();
 });
 
