@@ -1,7 +1,7 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { storeHost } from "service/redis";
+import { storeCallStatus, storeHost } from "service/redis";
 import { makeCallsInBatch } from "service/twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
@@ -40,6 +40,7 @@ app.post("/callupdate", async (req, res) => {
     "for Call SID:",
     req.body.CallSid
   );
+  storeCallStatus(req.body.CallSid, req.body.CallStatus);
   return res.status(200).send();
 });
 

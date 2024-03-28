@@ -48,10 +48,38 @@ async function removeConversationHistory(callSid: string) {
   await redisClient.del(callSid);
 }
 
+async function storeCallStatus(callSid: string, callStatus: string) {
+  await redisClient.hSet(`call:${callSid}`, "status", callStatus);
+}
+
+async function getCallStatus(callSid: string): Promise<string | null> {
+  const status = await redisClient.hGet(`call:${callSid}`, "status");
+  return status || null;
+}
+
+async function hasCallFinished(callSid: string): Promise<boolean> {
+  const status = await getCallStatus(callSid);
+  if (status === null) {
+    console.log(`Call status not found for callSid: ${callSid}`);
+    return false;
+  }
+  const finishedStatuses = [
+    "completed",
+    "busy",
+    "canceled",
+    "failed",
+    "no-answer",
+  ];
+  return finishedStatuses.includes(status);
+}
+
 export {
   connectRedis,
+  getCallStatus,
   getConversationHistory,
+  hasCallFinished,
   removeConversationHistory,
+  storeCallStatus,
   storeHost,
   storeMessage,
 };

@@ -42,8 +42,6 @@ const hangupCall = async (callSid?: string | null) => {
       return;
     }
     await twilioClient.calls(callSid).update({ status: "completed" });
-    decrementActiveCallCount();
-    await removeConversationHistory(callSid);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
@@ -62,7 +60,10 @@ const updateInProgessCall = async (
       throw Error(`Cannot Update Call, CallSid: ${callSid} Doesn't Exists.`);
     }
     if (responseType === ResponseType.END_CALL) {
-      return await hangupCall(callSid);
+      await hangupCall(callSid);
+      decrementActiveCallCount();
+      removeConversationHistory(callSid);
+      return;
     }
     const response = new VoiceResponse();
     if (responseType === ResponseType.SAY_FOR_VOICE) {
@@ -83,7 +84,7 @@ const updateInProgessCall = async (
       track: "inbound_track",
     });
     response.pause({
-      length: 120,
+      length: 90,
     });
     const twiml = response.toString();
     await twilioClient.calls(callSid).update({
@@ -91,18 +92,21 @@ const updateInProgessCall = async (
     });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
-    console.error({ reason, message: "Failed to Update Call" });
+    console.error({
+      message: "Failed to Update Call",
+      code: err.code,
+      callSid,
+      reason,
+    });
+
     if (err?.code == 21220) {
-      console.error({
-        message: "Failed to Update Call",
-        code: err.code,
-        callSid,
-        reason,
-      });
-      await hangupCall(callSid);
+      decrementActiveCallCount();
+      removeConversationHistory(callSid);
       return;
     }
-    throw err;
+
+    //TODO: failed call update
+    //throw err;
   }
 };
 

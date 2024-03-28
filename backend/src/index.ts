@@ -7,13 +7,21 @@ import EventEmitter from "events";
 import { createServer } from "http";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
-import { connectRedis } from "service/redis";
+import {
+  connectRedis,
+  hasCallFinished,
+  removeConversationHistory,
+} from "service/redis";
 import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
 import { PORT } from "utils/config";
-import { WebSocketServer } from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 import app from "./app";
+
+interface CustomWebSocket extends WebSocket {
+  connectionLabel?: string;
+}
 
 const assistantMessages: Array<{
   response: AssistantResponse;
@@ -50,7 +58,7 @@ const startServer = async () => {
     const wss = new WebSocketServer({ server });
     await connectOpenAI();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    wss.on("connection", (ws: Record<string, any>) => {
+    wss.on("connection", (ws: CustomWebSocket) => {
       console.info("New Client Connected");
 
       const deepgramConnection: LiveClient = deepgramClient.listen.live({
@@ -60,14 +68,14 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        // endpointing: 100,
+        endpointing: 20,
         // interim_results: true,
         // utterance_end_ms: 1000,
       });
       let messageQueue: Array<Buffer> = [];
       let transcriptCollection: Array<string> = [];
 
-      ws.on("message", (data: $TSFixMe) => {
+      ws.on("message", async (data: $TSFixMe) => {
         const twilioMessage = JSON.parse(data);
         const event = twilioMessage["event"];
         const isDeepgramConnectionReady =
@@ -78,17 +86,36 @@ const startServer = async () => {
         }
 
         if (event === "start") {
-          const streamSid = twilioMessage.streamSid;
           const callSid = twilioMessage.start.callSid;
           //TODO: add streamSid to callSid map
-          ws.callSid = callSid;
+          ws.connectionLabel = callSid;
+          const shouldNotSendPackets = await hasCallFinished(callSid);
+          if (shouldNotSendPackets) {
+            //There is no point in sending more packets if call has finished
+            console.info(`Closing WS connection and Call: ${callSid}`);
+            ws.close();
+            decrementActiveCallCount();
+            removeConversationHistory(callSid);
+          }
+          const streamSid = twilioMessage.streamSid;
           console.info(`Starting Media Stream ${streamSid} for ${callSid}`);
           console.info(`There are ${getCurrentActiveCallCount()} active calls`);
         }
 
         if (event === "media") {
-          if (isDeepgramConnectionReady) {
-            ws.subscribedStream = twilioMessage.streamSid;
+          const shouldNotSendPackets = await hasCallFinished(
+            ws.connectionLabel || ""
+          );
+
+          if (shouldNotSendPackets) {
+            //There is no point in sending more packets if call has finished
+            console.info(
+              `Closing WS connection and Call: ${ws.connectionLabel}`
+            );
+            ws.close();
+            decrementActiveCallCount();
+            removeConversationHistory(ws.connectionLabel || "");
+          } else if (isDeepgramConnectionReady) {
             const media = twilioMessage["media"];
             const audio = Buffer.from(media["payload"], "base64");
             deepgramConnection.send(audio);
@@ -136,7 +163,7 @@ const startServer = async () => {
               // type: transcription.type,
               speech_final: transcription.speech_final,
               is_final: transcription.is_final,
-              callSid: ws.callSid,
+              callSid: ws.connectionLabel,
               // channel_index: transcription.channel_index,
               transcript,
             });
@@ -165,10 +192,9 @@ const startServer = async () => {
             console.info({
               transcript,
               userInput,
-              callSid: ws.callSid,
+              callSid: ws.connectionLabel,
             });
-            //TODO: add more strong check of no overallp for streamSid and callSid
-            agent(userInput, ws.callSid, enqueueAssistantMessage);
+            agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
           }
         );
 
