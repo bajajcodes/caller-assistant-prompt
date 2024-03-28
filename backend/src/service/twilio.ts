@@ -1,5 +1,6 @@
 import twillio, { Twilio } from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { decrementActiveCallCount, incrementActiveCallCount } from "index";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { AssistantResponse } from "../types/openai";
@@ -10,11 +11,7 @@ import {
   TWILIO_FROM_NUMBER,
 } from "../utils/config";
 import { getSystemRoleMessage } from "./openai";
-import {
-  incrementActiveCallCount,
-  removeConversationHistory,
-  storeMessage,
-} from "./redis";
+import { removeConversationHistory, storeMessage } from "./redis";
 
 let twilioClient: Twilio;
 const VoiceResponse = twillio.twiml.VoiceResponse;
@@ -45,6 +42,7 @@ const hangupCall = async (callSid?: string | null) => {
       return;
     }
     await twilioClient.calls(callSid).update({ status: "completed" });
+    decrementActiveCallCount();
     await removeConversationHistory(callSid);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {

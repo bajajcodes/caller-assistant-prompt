@@ -9,7 +9,6 @@ import { REDIS_CLIENT_URL } from "utils/config";
 type Message = ChatCompletionMessageParam;
 
 let redisClient: RedisClientType;
-let currentActiveCallCount = 0;
 
 const connectRedis = async () => {
   try {
@@ -47,30 +46,11 @@ async function getConversationHistory(callSid: string) {
 
 async function removeConversationHistory(callSid: string) {
   await redisClient.del(callSid);
-  decrementActiveCallCount();
-}
-
-async function incrementActiveCallCount() {
-  // await redisClient.incr("activeCallCount");
-  //TODO: use redis
-  currentActiveCallCount++;
-}
-
-async function decrementActiveCallCount() {
-  // await redisClient.decr("activeCallCount");
-  //TODO: use redis
-  currentActiveCallCount--;
-}
-
-function getCurrentActiveCallCount(): number {
-  return currentActiveCallCount;
 }
 
 export {
   connectRedis,
   getConversationHistory,
-  getCurrentActiveCallCount,
-  incrementActiveCallCount,
   removeConversationHistory,
   storeHost,
   storeMessage,

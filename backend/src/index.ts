@@ -7,7 +7,7 @@ import EventEmitter from "events";
 import { createServer } from "http";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
-import { connectRedis, getCurrentActiveCallCount } from "service/redis";
+import { connectRedis } from "service/redis";
 import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
@@ -19,9 +19,10 @@ const assistantMessages: Array<{
   response: AssistantResponse;
   callSid: string;
 }> = [];
-export const messageQueue = new EventEmitter();
+const messageQueue = new EventEmitter();
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const port = PORT || 3000;
+let currentActiveCallCount = 0;
 
 const enqueueAssistantMessage = (
   assitantResponse: AssistantResponse,
@@ -30,6 +31,18 @@ const enqueueAssistantMessage = (
   assistantMessages.push({ response: assitantResponse, callSid });
   messageQueue.emit("new_message");
 };
+
+export function incrementActiveCallCount() {
+  currentActiveCallCount++;
+}
+
+export function decrementActiveCallCount() {
+  currentActiveCallCount--;
+}
+
+function getCurrentActiveCallCount(): number {
+  return currentActiveCallCount;
+}
 
 const startServer = async () => {
   try {
@@ -47,7 +60,7 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        endpointing: 50,
+        // endpointing: 100,
         // interim_results: true,
         // utterance_end_ms: 1000,
       });
@@ -192,6 +205,7 @@ const startProcessingAssistantMessages = async () => {
           messageQueue.once("new_message", resolve)
         );
       }
+      console.info(`There are ${getCurrentActiveCallCount()} active calls`);
     }
   } catch (err) {
     console.error({ err });
