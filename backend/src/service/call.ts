@@ -85,9 +85,7 @@ export class CallService {
     if (!this.isRedisConnected || !this.redisClient) {
       throw new Error("Redis client is not connected");
     }
-    console.info(`Data for ${callSid} to be updated.`);
     const existingCall = await this.getCall(callSid);
-    console.info(`Exisiting Call ${callSid} data exists.`);
     if (existingCall) {
       const mergedCall = { ...existingCall, ...updatedCall };
       await this.redisClient.hSet(callSid, {
@@ -98,7 +96,9 @@ export class CallService {
         callEndedByWhom: mergedCall.callEndedByWhom,
         callApplicationStatus: mergedCall.callApplicationStatus,
       });
-
+      console.info(
+        `Updated: ${callSid} with ${Object.keys(updatedCall).join(" ")}`
+      );
       if (updatedCall.callTranscription) {
         for (const message of updatedCall.callTranscription) {
           await this.redisClient.rPush(

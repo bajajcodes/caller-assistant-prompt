@@ -1,6 +1,7 @@
-import twillio, { Twilio } from "twilio";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { getCallService } from "index";
+import twillio, { Twilio } from "twilio";
+import { CALL_APPLICATION_STATUS, CALL_ENDED_BY_WHOM } from "types/call";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { AssistantResponse } from "../types/openai";
@@ -32,7 +33,11 @@ const connectTwilio = () => {
   }
 };
 
-const hangupCall = async (callSid?: string | null) => {
+const hangupCall = async (
+  callSid: string | null | undefined,
+  callEndedBy: CALL_ENDED_BY_WHOM,
+  callEndReason: string = "NA"
+) => {
   try {
     if (!callSid) {
       console.info(
@@ -40,9 +45,17 @@ const hangupCall = async (callSid?: string | null) => {
       );
       return;
     }
+    const callService = getCallService();
+    const isCallTerminated = await callService.hasCallFinished(callSid);
+    if (isCallTerminated) return;
     await twilioClient.calls(callSid).update({ status: "completed" });
-    //TODO: store complete call information when call is ended or hangedup
-    // await removeConversationHistory(callSid);
+    await callService.updateCall(callSid, {
+      callApplicationStatus: CALL_APPLICATION_STATUS.NA,
+      callEndedByWhom: callEndedBy,
+      callEndReason: callEndReason,
+      callStatus: "completed",
+    });
+    console.info(`Call ${callSid} ended by ${CALL_ENDED_BY_WHOM.BOT}.`);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
@@ -62,8 +75,7 @@ const updateInProgessCall = async (
     }
     if (responseType === ResponseType.END_CALL) {
       //INFO: content is not spoken out if response type is end call
-      await hangupCall(callSid);
-      // removeConversationHistory(callSid);
+      await hangupCall(callSid, CALL_ENDED_BY_WHOM.BOT);
       return;
     }
     const response = new VoiceResponse();
@@ -96,15 +108,11 @@ const updateInProgessCall = async (
       callSid,
       reason,
     });
-
-    if (err?.code == 21220) {
-      //TODO: add function completion here
-      // removeConversationHistory(callSid);
-      return;
-    }
-
-    //TODO: failed call update
-    //throw err;
+    await hangupCall(
+      callSid,
+      CALL_ENDED_BY_WHOM.ERROR,
+      `Failed to Update Call: ${reason}`
+    );
   }
 };
 

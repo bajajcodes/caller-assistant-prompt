@@ -6,7 +6,8 @@ export enum MODELS {
 
 //info: temporarily stored here
 export enum ENDPOINTING {
-  INITAL = 50,
+  INITAL = 10,
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   AFTER_TIMEOUT = 10,
 }
 

@@ -5,11 +5,13 @@ import {
   ChatCompletionSystemMessageParam,
   ChatCompletionUserMessageParam,
 } from "openai/resources/index.mjs";
+import { CALL_ENDED_BY_WHOM } from "types/call";
 import { AssistantResponse, MODELS } from "types/openai";
 import { systemPromptCollection } from "utils/data";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { $TSFixMe } from "../types/common";
 import { OPEN_AI_KEY } from "../utils/config";
+import { hangupCall } from "./twilio";
 
 let openaiClient: OpenAI;
 
@@ -97,7 +99,11 @@ const agent = async (
       message: "Failed to get LLM or Assistant Response.",
       reason,
     });
-    throw err;
+    await hangupCall(
+      callSid,
+      CALL_ENDED_BY_WHOM.ERROR,
+      `Failed to get LLM or Assistant Response: ${callSid} for ${reason}.`
+    );
   }
 };
 

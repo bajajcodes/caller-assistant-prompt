@@ -10,6 +10,7 @@ import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
 import { connectRedis, redisClient } from "service/redis";
 import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
+import { CALL_ENDED_BY_WHOM } from "types/call";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
 import { PORT } from "utils/config";
@@ -73,7 +74,7 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        endpointing: 20,
+        endpointing: 10,
         // interim_results: true,
         // utterance_end_ms: 1000,
       });
@@ -92,20 +93,16 @@ const startServer = async () => {
 
         if (event === "start") {
           const callSid = twilioMessage.start.callSid;
-          //TODO: add streamSid to callSid map
           ws.connectionLabel = callSid;
           const shouldNotSendPackets =
             await callService.hasCallFinished(callSid);
+          //There is no point in sending more packets if call has finished/terminated
           if (shouldNotSendPackets) {
-            //There is no point in sending more packets if call has finished
             console.info(`Closing WS connection and Call: ${callSid}`);
-            // decrementActiveCallCount();
-            hangupCall(ws.connectionLabel);
             ws.close();
           }
           const streamSid = twilioMessage.streamSid;
           console.info(`Starting Media Stream ${streamSid} for ${callSid}`);
-          // console.info(`There are ${getCurrentActiveCallCount()} active calls`);
         }
 
         if (event === "media") {
@@ -113,20 +110,17 @@ const startServer = async () => {
             ws.connectionLabel || ""
           );
 
+          //There is no point in sending more packets if call has finished/terminated
           if (shouldNotSendPackets) {
-            //There is no point in sending more packets if call has finished
             console.info(
               `Closing WS connection and Call: ${ws.connectionLabel}`
             );
-            // decrementActiveCallCount();
-            hangupCall(ws.connectionLabel);
             ws.close();
           } else if (isDeepgramConnectionReady) {
             const media = twilioMessage["media"];
             const audio = Buffer.from(media["payload"], "base64");
             deepgramConnection.send(audio);
           } else {
-            //INFO: messagequeue packets are dropped
             //TODO: use dropped audio packets
             messageQueue.push(data);
           }
@@ -140,23 +134,27 @@ const startServer = async () => {
         }
       });
 
-      ws.on("error", (err: $TSFixMe) => {
-        const message = err?.message || "Something Went Wrong!!";
+      ws.on("error", async (err: $TSFixMe) => {
+        const reason = err?.message || "Something Went Wrong";
         if (deepgramConnection) {
           deepgramConnection.finish();
         }
-        throw Error(message);
+        if (ws.connectionLabel) {
+          await hangupCall(
+            ws.connectionLabel,
+            CALL_ENDED_BY_WHOM.ERROR,
+            `Websocket Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`
+          );
+        } else throw Error(reason);
       });
 
       deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
         console.info("Deepgram connection is ready and opened.");
         console.info(
-          `Message Queue has lost total of ${messageQueue.length} messages`
+          `Call total ${messageQueue.length} audio packets or messages has been lost.`
         );
         if (messageQueue.length > 0) {
-          // messageQueue.forEach((msg) => {
-          //   ws.emit("message", msg);
-          // });
+          //TODO: use message queue packets
           messageQueue = [];
         }
         deepgramConnection.on(
@@ -164,11 +162,11 @@ const startServer = async () => {
           async (transcription: LiveTranscriptionEvent) => {
             const transcript = transcription.channel.alternatives[0].transcript;
             console.info({
-              start: transcription.start,
-              duration: transcription.duration,
+              // start: transcription.start,
+              // duration: transcription.duration,
               // type: transcription.type,
-              speech_final: transcription.speech_final,
-              is_final: transcription.is_final,
+              // speech_final: transcription.speech_final,
+              // is_final: transcription.is_final,
               callSid: ws.connectionLabel,
               // channel_index: transcription.channel_index,
               transcript,
@@ -196,7 +194,6 @@ const startServer = async () => {
             const userInput = transcriptCollection.join("");
             transcriptCollection = [];
             console.info({
-              transcript,
               userInput,
               callSid: ws.connectionLabel,
             });
@@ -207,6 +204,18 @@ const startServer = async () => {
         deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
           console.info("Deepgram Connection closed.");
         });
+
+        deepgramConnection.on(
+          LiveTranscriptionEvents.Error,
+          async (err: $TSFixMe) => {
+            const reason = err?.message || "Something Went Wrong";
+            await hangupCall(
+              ws.connectionLabel,
+              CALL_ENDED_BY_WHOM.ERROR,
+              `Deepgram Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`
+            );
+          }
+        );
       });
     });
     console.info(`Listening on port ${port}`);
@@ -237,7 +246,6 @@ const startProcessingAssistantMessages = async () => {
           messageQueue.once("new_message", resolve)
         );
       }
-      // console.info(`There are ${getCurrentActiveCallCount()} active calls`);
     }
   } catch (err) {
     console.error({ err });

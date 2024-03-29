@@ -4,6 +4,7 @@ import express from "express";
 import { getCallService } from "index";
 import { storeHost } from "service/redis";
 import { makeCallsInBatch } from "service/twilio";
+import { CALL_APPLICATION_STATUS, CALL_ENDED_BY_WHOM } from "types/call";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
 const app: Express = express();
@@ -41,8 +42,29 @@ app.post("/callupdate", async (req, res) => {
     "for Call SID:",
     req.body.CallSid
   );
+  const callTerminationStatuses = [
+    "completed",
+    "busy",
+    "failed",
+    "no-answer",
+    "canceled",
+  ];
   const callSevice = getCallService();
-  callSevice.updateCall(req.body.CallSid, { callStatus: req.body.CallStatus });
+
+  if (callTerminationStatuses.includes(req.body.CallStatus)) {
+    await callSevice.updateCall(req.body.CallSid, {
+      callStatus: req.body.CallStatus,
+      callEndedByWhom: CALL_ENDED_BY_WHOM.CALL_TO,
+      callApplicationStatus: CALL_APPLICATION_STATUS.NA,
+      callEndReason:
+        req.body.CallStatus === "completed" ? "NA" : "Call was not Accepted.",
+    });
+  } else {
+    callSevice.updateCall(req.body.CallSid, {
+      callStatus: req.body.CallStatus,
+    });
+  }
+
   return res.status(200).send();
 });
 
