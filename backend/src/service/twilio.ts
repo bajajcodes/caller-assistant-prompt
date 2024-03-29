@@ -1,6 +1,6 @@
 import twillio, { Twilio } from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { decrementActiveCallCount, incrementActiveCallCount } from "index";
+import { cleanupCallLLM, handleCallLLM } from "index";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { AssistantResponse } from "../types/openai";
@@ -42,6 +42,7 @@ const hangupCall = async (callSid?: string | null) => {
       return;
     }
     await twilioClient.calls(callSid).update({ status: "completed" });
+    cleanupCallLLM(callSid);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
@@ -60,8 +61,9 @@ const updateInProgessCall = async (
       throw Error(`Cannot Update Call, CallSid: ${callSid} Doesn't Exists.`);
     }
     if (responseType === ResponseType.END_CALL) {
+      //INFO: content is not spoken out if response type is end call
       await hangupCall(callSid);
-      decrementActiveCallCount();
+      // decrementActiveCallCount();
       removeConversationHistory(callSid);
       return;
     }
@@ -70,10 +72,10 @@ const updateInProgessCall = async (
       response.say(content);
     }
     if (responseType === ResponseType.SEND_DIGITS) {
-      const digits = content
-        .split("")
-        .map((digit) => `${digit === "#" ? "" : "w"}${digit}`)
-        .join("");
+      const digits = content;
+      // .split("")
+      // .map((digit) => `${digit === "#" ? "" : "w"}${digit}`)
+      // .join("");
       response.play({
         digits,
       });
@@ -100,7 +102,7 @@ const updateInProgessCall = async (
     });
 
     if (err?.code == 21220) {
-      decrementActiveCallCount();
+      // decrementActiveCallCount();
       removeConversationHistory(callSid);
       return;
     }
@@ -146,7 +148,8 @@ const makeacall = async (
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     });
     await storeMessage(call.sid, systemRoleMessage);
-    incrementActiveCallCount();
+    handleCallLLM(call.sid);
+    // incrementActiveCallCount();
   } catch (err: $TSFixMe) {
     console.error({ err });
   }

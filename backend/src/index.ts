@@ -12,10 +12,10 @@ import {
   hasCallFinished,
   removeConversationHistory,
 } from "service/redis";
-import { connectTwilio, updateInProgessCall } from "service/twilio";
+import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
-import { AssistantResponse } from "types/openai";
-import { PORT } from "utils/config";
+import { AssistantResponse, MODELS } from "types/openai";
+import { LLM_MODEL_SWITCH_DURATION, PORT } from "utils/config";
 import WebSocket, { WebSocketServer } from "ws";
 import app from "./app";
 
@@ -23,6 +23,9 @@ interface CustomWebSocket extends WebSocket {
   connectionLabel?: string;
 }
 
+const timeout = LLM_MODEL_SWITCH_DURATION
+  ? parseInt(LLM_MODEL_SWITCH_DURATION, 10)
+  : 90000;
 const assistantMessages: Array<{
   response: AssistantResponse;
   callSid: string;
@@ -30,7 +33,14 @@ const assistantMessages: Array<{
 const messageQueue = new EventEmitter();
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const port = PORT || 3000;
-let currentActiveCallCount = 0;
+//TODO: Clean up the call model mapping after the call ends
+const callModels: {
+  [key: string]: {
+    model: MODELS;
+    endpointing: number;
+  };
+} = {};
+// let currentActiveCallCount = 0;
 
 const enqueueAssistantMessage = (
   assitantResponse: AssistantResponse,
@@ -40,17 +50,43 @@ const enqueueAssistantMessage = (
   messageQueue.emit("new_message");
 };
 
-export function incrementActiveCallCount() {
-  currentActiveCallCount++;
+// export function incrementActiveCallCount() {
+//   currentActiveCallCount++;
+// }
+
+// export function decrementActiveCallCount() {
+//   currentActiveCallCount--;
+// }
+
+export function handleCallLLM(callSid: string) {
+  callModels[callSid] = {
+    model: MODELS.GPT_3_5_TUBRO,
+    endpointing: 25,
+  };
+  console.info(`Using ${MODELS.GPT_3_5_TUBRO} Model for ${callSid}.`);
+  console.info(`Using Endpointing of 25 ms for ${callSid}.`);
+  setTimeout(() => {
+    //INFO: closure get's applied here
+    console.info(
+      `1 minute 30 seconds of timer done. Switching from: ${MODELS.GPT_3_5_TUBRO} to: ${MODELS.GPT4_1106_PREVIEW}.`
+    );
+    console.info(`Using Endpointing of 10 ms for ${callSid}.`);
+    callModels[callSid].model = MODELS.GPT4_1106_PREVIEW;
+    callModels[callSid].endpointing = 10;
+  }, timeout);
 }
 
-export function decrementActiveCallCount() {
-  currentActiveCallCount--;
+export function cleanupCallLLM(callSid: string) {
+  delete callModels[callSid];
 }
 
-function getCurrentActiveCallCount(): number {
-  return currentActiveCallCount;
+export function getCallLLM(callSid: string) {
+  return callModels[callSid].model;
 }
+
+// function getCurrentActiveCallCount(): number {
+//   return currentActiveCallCount;
+// }
 
 const startServer = async () => {
   try {
@@ -94,12 +130,13 @@ const startServer = async () => {
             //There is no point in sending more packets if call has finished
             console.info(`Closing WS connection and Call: ${callSid}`);
             ws.close();
-            decrementActiveCallCount();
+            // decrementActiveCallCount();
             removeConversationHistory(callSid);
+            await hangupCall(ws.connectionLabel);
           }
           const streamSid = twilioMessage.streamSid;
           console.info(`Starting Media Stream ${streamSid} for ${callSid}`);
-          console.info(`There are ${getCurrentActiveCallCount()} active calls`);
+          // console.info(`There are ${getCurrentActiveCallCount()} active calls`);
         }
 
         if (event === "media") {
@@ -113,8 +150,9 @@ const startServer = async () => {
               `Closing WS connection and Call: ${ws.connectionLabel}`
             );
             ws.close();
-            decrementActiveCallCount();
+            // decrementActiveCallCount();
             removeConversationHistory(ws.connectionLabel || "");
+            await hangupCall(ws.connectionLabel);
           } else if (isDeepgramConnectionReady) {
             const media = twilioMessage["media"];
             const audio = Buffer.from(media["payload"], "base64");
@@ -231,7 +269,7 @@ const startProcessingAssistantMessages = async () => {
           messageQueue.once("new_message", resolve)
         );
       }
-      console.info(`There are ${getCurrentActiveCallCount()} active calls`);
+      // console.info(`There are ${getCurrentActiveCallCount()} active calls`);
     }
   } catch (err) {
     console.error({ err });

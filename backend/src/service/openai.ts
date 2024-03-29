@@ -1,3 +1,4 @@
+import { getCallLLM } from "index";
 import OpenAI from "openai";
 import {
   ChatCompletionAssistantMessageParam,
@@ -8,34 +9,10 @@ import { AssistantResponse, MODELS } from "types/openai";
 import { systemPromptCollection } from "utils/data";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { $TSFixMe } from "../types/common";
-import { LLM_MODEL_SWITCH_DURATION, OPEN_AI_KEY } from "../utils/config";
+import { OPEN_AI_KEY } from "../utils/config";
 import { getConversationHistory, storeMessage } from "./redis";
 
-const timeout = LLM_MODEL_SWITCH_DURATION
-  ? parseInt(LLM_MODEL_SWITCH_DURATION, 10)
-  : 90000;
-let timeoutId: NodeJS.Timeout;
-//TODO: use model switcher
-let LLM_MODEL = MODELS.GPT4_1106_PREVIEW;
 let openaiClient: OpenAI;
-
-export const resetLLMModelTimer = () => {
-  if (timeoutId) {
-    console.info(
-      `Resetting 1 minute 30 seconds of timer. Switching from: ${LLM_MODEL} to: ${MODELS.GPT_3_5_TUBRO}.`
-    );
-    LLM_MODEL = MODELS.GPT_3_5_TUBRO;
-    clearTimeout(timeoutId);
-  }
-  timeoutId = setTimeout(() => {
-    //INFO: closure get's applied here
-    console.info(
-      `1 minute 30 seconds of timer done. Switching from: ${LLM_MODEL} to: ${MODELS.GPT4_1106_PREVIEW}.`
-    );
-    LLM_MODEL = MODELS.GPT4_1106_PREVIEW;
-  }, timeout);
-  console.info("Switch LLM Model Timer Started.");
-};
 
 const getSystemRoleMessage = (
   providerData: Record<string, string>
@@ -81,6 +58,13 @@ const agent = async (
       content: userInput,
     };
     chatMessages.push(userRoleMessage);
+    let LLM_MODEL = getCallLLM(callSid);
+    if (!LLM_MODEL) {
+      LLM_MODEL = MODELS.GPT4_1106_PREVIEW;
+      console.info(
+        `Call Not Initialized with LLM Model, Switching To LLM Model: ${MODELS.GPT4_1106_PREVIEW} for ${callSid}`
+      );
+    }
     const completeion = await openaiClient.chat.completions.create({
       messages: chatMessages,
       model: LLM_MODEL,
