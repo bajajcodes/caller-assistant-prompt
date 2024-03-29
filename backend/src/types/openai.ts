@@ -4,16 +4,17 @@ export enum MODELS {
   GPT_3_5_TUBRO = "gpt-3.5-turbo",
 }
 
+//info: temporarily stored here
+export enum ENDPOINTING {
+  INITAL = 50,
+  AFTER_TIMEOUT = 10,
+}
+
 export enum ResponseType {
   SAY_FOR_VOICE = "sayForVoice",
   SEND_DIGITS = "sendDigits",
   END_CALL = "endCall",
 }
-
-// export enum InputSource {
-//   HUMAN = "Human",
-//   IVR = "IVR",
-// }
 
 interface BaseResponse {
   responseType: ResponseType;
