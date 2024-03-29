@@ -1,4 +1,4 @@
-import { getCallLLM } from "index";
+import { getCallService } from "index";
 import OpenAI from "openai";
 import {
   ChatCompletionAssistantMessageParam,
@@ -10,7 +10,6 @@ import { systemPromptCollection } from "utils/data";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { $TSFixMe } from "../types/common";
 import { OPEN_AI_KEY } from "../utils/config";
-import { getConversationHistory, storeMessage } from "./redis";
 
 let openaiClient: OpenAI;
 
@@ -49,8 +48,9 @@ const agent = async (
   onUpdate: (assistantPrompt: AssistantResponse, callSid: string) => void
 ): Promise<void> => {
   try {
+    const callService = getCallService();
     if (!callSid) throw Error(`CallSid: ${callSid} is Missing.`);
-    const chatMessages = await getConversationHistory(callSid);
+    const chatMessages = await callService.getConversationHistory(callSid);
     if (!chatMessages || chatMessages.length < 1)
       throw Error(`Chat Messages for CallSid: ${callSid} are Missing.`);
     const userRoleMessage: ChatCompletionUserMessageParam = {
@@ -58,7 +58,7 @@ const agent = async (
       content: userInput,
     };
     chatMessages.push(userRoleMessage);
-    let LLM_MODEL = getCallLLM(callSid);
+    let LLM_MODEL = await callService.getCallModel(callSid);
     if (!LLM_MODEL) {
       LLM_MODEL = MODELS.GPT4_1106_PREVIEW;
       console.info(
@@ -85,8 +85,8 @@ const agent = async (
       role: "assistant",
       content: assistantPrompt,
     };
-    await storeMessage(callSid, userRoleMessage);
-    await storeMessage(callSid, assistantRoleMessage);
+    await callService.storeMessage(callSid, userRoleMessage);
+    await callService.storeMessage(callSid, assistantRoleMessage);
     console.info(
       `CallSid: ${callSid} Chat Messages length is ${chatMessages.length + 1}`
     );

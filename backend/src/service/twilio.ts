@@ -1,6 +1,6 @@
 import twillio, { Twilio } from "twilio";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { cleanupCallLLM, handleCallLLM } from "index";
+import { getCallService } from "index";
 import { $TSFixMe } from "types/common";
 import { ResponseType } from "types/openai";
 import { AssistantResponse } from "../types/openai";
@@ -11,7 +11,6 @@ import {
   TWILIO_FROM_NUMBER,
 } from "../utils/config";
 import { getSystemRoleMessage } from "./openai";
-import { removeConversationHistory, storeMessage } from "./redis";
 
 let twilioClient: Twilio;
 const VoiceResponse = twillio.twiml.VoiceResponse;
@@ -42,7 +41,8 @@ const hangupCall = async (callSid?: string | null) => {
       return;
     }
     await twilioClient.calls(callSid).update({ status: "completed" });
-    cleanupCallLLM(callSid);
+    //TODO: store complete call information when call is ended or hangedup
+    // await removeConversationHistory(callSid);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
@@ -63,8 +63,7 @@ const updateInProgessCall = async (
     if (responseType === ResponseType.END_CALL) {
       //INFO: content is not spoken out if response type is end call
       await hangupCall(callSid);
-      // decrementActiveCallCount();
-      removeConversationHistory(callSid);
+      // removeConversationHistory(callSid);
       return;
     }
     const response = new VoiceResponse();
@@ -73,9 +72,6 @@ const updateInProgessCall = async (
     }
     if (responseType === ResponseType.SEND_DIGITS) {
       const digits = content;
-      // .split("")
-      // .map((digit) => `${digit === "#" ? "" : "w"}${digit}`)
-      // .join("");
       response.play({
         digits,
       });
@@ -102,8 +98,8 @@ const updateInProgessCall = async (
     });
 
     if (err?.code == 21220) {
-      // decrementActiveCallCount();
-      removeConversationHistory(callSid);
+      //TODO: add function completion here
+      // removeConversationHistory(callSid);
       return;
     }
 
@@ -147,9 +143,8 @@ const makeacall = async (
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     });
-    await storeMessage(call.sid, systemRoleMessage);
-    handleCallLLM(call.sid);
-    // incrementActiveCallCount();
+    const callService = getCallService();
+    await callService.createCall(call.sid, systemRoleMessage);
   } catch (err: $TSFixMe) {
     console.error({ err });
   }

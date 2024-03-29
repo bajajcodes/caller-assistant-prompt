@@ -5,17 +5,14 @@ import {
 } from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
+import { CallService } from "service/call";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
-import {
-  connectRedis,
-  hasCallFinished,
-  removeConversationHistory,
-} from "service/redis";
+import { connectRedis, redisClient } from "service/redis";
 import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
-import { AssistantResponse, MODELS } from "types/openai";
-import { LLM_MODEL_SWITCH_DURATION, PORT } from "utils/config";
+import { AssistantResponse } from "types/openai";
+import { PORT } from "utils/config";
 import WebSocket, { WebSocketServer } from "ws";
 import app from "./app";
 
@@ -23,9 +20,6 @@ interface CustomWebSocket extends WebSocket {
   connectionLabel?: string;
 }
 
-const timeout = LLM_MODEL_SWITCH_DURATION
-  ? parseInt(LLM_MODEL_SWITCH_DURATION, 10)
-  : 90000;
 const assistantMessages: Array<{
   response: AssistantResponse;
   callSid: string;
@@ -33,14 +27,26 @@ const assistantMessages: Array<{
 const messageQueue = new EventEmitter();
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const port = PORT || 3000;
-//TODO: Clean up the call model mapping after the call ends
-const callModels: {
-  [key: string]: {
-    model: MODELS;
-    endpointing: number;
-  };
-} = {};
-// let currentActiveCallCount = 0;
+let callService: CallService;
+
+export function getCallService(): CallService {
+  if (!callService) {
+    throw new Error("CallService is not initialized");
+  }
+  return callService;
+}
+
+export async function initializeCallService() {
+  callService = new CallService();
+  await setCallServiceRedisClient();
+}
+
+export async function setCallServiceRedisClient() {
+  if (!redisClient) {
+    throw new Error("Redis client is not connected");
+  }
+  callService.setRedisClient(redisClient);
+}
 
 const enqueueAssistantMessage = (
   assitantResponse: AssistantResponse,
@@ -50,49 +56,12 @@ const enqueueAssistantMessage = (
   messageQueue.emit("new_message");
 };
 
-// export function incrementActiveCallCount() {
-//   currentActiveCallCount++;
-// }
-
-// export function decrementActiveCallCount() {
-//   currentActiveCallCount--;
-// }
-
-export function handleCallLLM(callSid: string) {
-  callModels[callSid] = {
-    model: MODELS.GPT_3_5_TUBRO,
-    endpointing: 25,
-  };
-  console.info(`Using ${MODELS.GPT_3_5_TUBRO} Model for ${callSid}.`);
-  console.info(`Using Endpointing of 25 ms for ${callSid}.`);
-  setTimeout(() => {
-    //INFO: closure get's applied here
-    console.info(
-      `1 minute 30 seconds of timer done. Switching from: ${MODELS.GPT_3_5_TUBRO} to: ${MODELS.GPT4_1106_PREVIEW}.`
-    );
-    console.info(`Using Endpointing of 10 ms for ${callSid}.`);
-    callModels[callSid].model = MODELS.GPT4_1106_PREVIEW;
-    callModels[callSid].endpointing = 10;
-  }, timeout);
-}
-
-export function cleanupCallLLM(callSid: string) {
-  delete callModels[callSid];
-}
-
-export function getCallLLM(callSid: string) {
-  return callModels[callSid].model;
-}
-
-// function getCurrentActiveCallCount(): number {
-//   return currentActiveCallCount;
-// }
-
 const startServer = async () => {
   try {
     const server = createServer(app);
     const wss = new WebSocketServer({ server });
     await connectOpenAI();
+    await initializeCallService();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     wss.on("connection", (ws: CustomWebSocket) => {
       console.info("New Client Connected");
@@ -125,14 +94,14 @@ const startServer = async () => {
           const callSid = twilioMessage.start.callSid;
           //TODO: add streamSid to callSid map
           ws.connectionLabel = callSid;
-          const shouldNotSendPackets = await hasCallFinished(callSid);
+          const shouldNotSendPackets =
+            await callService.hasCallFinished(callSid);
           if (shouldNotSendPackets) {
             //There is no point in sending more packets if call has finished
             console.info(`Closing WS connection and Call: ${callSid}`);
-            ws.close();
             // decrementActiveCallCount();
-            removeConversationHistory(callSid);
-            await hangupCall(ws.connectionLabel);
+            hangupCall(ws.connectionLabel);
+            ws.close();
           }
           const streamSid = twilioMessage.streamSid;
           console.info(`Starting Media Stream ${streamSid} for ${callSid}`);
@@ -140,7 +109,7 @@ const startServer = async () => {
         }
 
         if (event === "media") {
-          const shouldNotSendPackets = await hasCallFinished(
+          const shouldNotSendPackets = await callService.hasCallFinished(
             ws.connectionLabel || ""
           );
 
@@ -149,10 +118,9 @@ const startServer = async () => {
             console.info(
               `Closing WS connection and Call: ${ws.connectionLabel}`
             );
-            ws.close();
             // decrementActiveCallCount();
-            removeConversationHistory(ws.connectionLabel || "");
-            await hangupCall(ws.connectionLabel);
+            hangupCall(ws.connectionLabel);
+            ws.close();
           } else if (isDeepgramConnectionReady) {
             const media = twilioMessage["media"];
             const audio = Buffer.from(media["payload"], "base64");
