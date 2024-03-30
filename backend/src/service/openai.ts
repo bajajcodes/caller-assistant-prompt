@@ -79,7 +79,6 @@ const agent = async (
     const { message } = choice;
     const { content } = message;
     const assistantPrompt = content;
-    console.info({ assistantPrompt, model: completeion.model });
 
     if (!assistantPrompt) return;
     const assistantResponse = JSON.parse(assistantPrompt) as AssistantResponse;
@@ -87,6 +86,15 @@ const agent = async (
       role: "assistant",
       content: assistantPrompt,
     };
+
+    console.log({
+      bot: assistantResponse.content,
+    });
+    console.log({
+      model: completeion.model,
+      responseType: assistantResponse.responseType,
+    });
+
     await callService.storeMessage(callSid, userRoleMessage);
     await callService.storeMessage(callSid, assistantRoleMessage);
     console.info(

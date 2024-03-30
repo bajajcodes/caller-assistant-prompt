@@ -74,7 +74,7 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        endpointing: 10,
+        endpointing: 15,
         // interim_results: true,
         // utterance_end_ms: 1000,
       });
@@ -98,7 +98,9 @@ const startServer = async () => {
             await callService.hasCallFinished(callSid);
           //There is no point in sending more packets if call has finished/terminated
           if (shouldNotSendPackets) {
-            console.info(`Closing WS connection and Call: ${callSid}`);
+            console.info(
+              `Closing WS connection and Call: ${callSid} For event type start.`
+            );
             ws.close();
           }
           const streamSid = twilioMessage.streamSid;
@@ -113,16 +115,18 @@ const startServer = async () => {
           //There is no point in sending more packets if call has finished/terminated
           if (shouldNotSendPackets) {
             console.info(
-              `Closing WS connection and Call: ${ws.connectionLabel}`
+              `Closing WS connection and Call: ${ws.connectionLabel} For event type media.`
             );
             ws.close();
-          } else if (isDeepgramConnectionReady) {
-            const media = twilioMessage["media"];
-            const audio = Buffer.from(media["payload"], "base64");
-            deepgramConnection.send(audio);
           } else {
-            //TODO: use dropped audio packets
-            messageQueue.push(data);
+            if (isDeepgramConnectionReady) {
+              const media = twilioMessage["media"];
+              const audio = Buffer.from(media["payload"], "base64");
+              deepgramConnection.send(audio);
+            } else {
+              //TODO: use dropped audio packets
+              messageQueue.push(data);
+            }
           }
         }
       });
@@ -145,13 +149,15 @@ const startServer = async () => {
             CALL_ENDED_BY_WHOM.ERROR,
             `Websocket Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`
           );
-        } else throw Error(reason);
+        } else {
+          console.error({ error: reason });
+        }
       });
 
       deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
         console.info("Deepgram connection is ready and opened.");
         console.info(
-          `Call total ${messageQueue.length} audio packets or messages has been lost.`
+          `Message Queue total ${messageQueue.length} audio packets has been lost.`
         );
         if (messageQueue.length > 0) {
           //TODO: use message queue packets
@@ -160,21 +166,29 @@ const startServer = async () => {
         deepgramConnection.on(
           LiveTranscriptionEvents.Transcript,
           async (transcription: LiveTranscriptionEvent) => {
+            if (ws.connectionLabel) {
+              const shouldNotSendPackets = await callService.hasCallFinished(
+                ws.connectionLabel
+              );
+              if (shouldNotSendPackets) {
+                console.info("Cannot Send Transcritpion call is terminated.");
+                return;
+              }
+            }
+
             const transcript = transcription.channel.alternatives[0].transcript;
-            console.info({
-              // start: transcription.start,
-              // duration: transcription.duration,
-              // type: transcription.type,
-              // speech_final: transcription.speech_final,
-              // is_final: transcription.is_final,
-              callSid: ws.connectionLabel,
-              // channel_index: transcription.channel_index,
-              transcript,
-            });
+            console.info({ transcript });
 
             if (!transcript) {
               return;
             }
+
+            //info: get silent assuimg it's an interrupt
+            // console.info("Interrupting Bot to get Silent");
+            // updateInProgessCall(ws.connectionLabel!, {
+            //   content: "",
+            //   responseType: ResponseType.SAY_FOR_VOICE,
+            // });
 
             if (transcript && !transcription.speech_final) {
               transcriptCollection.push(transcript);
@@ -193,10 +207,7 @@ const startServer = async () => {
             transcriptCollection.push(transcript);
             const userInput = transcriptCollection.join("");
             transcriptCollection = [];
-            console.info({
-              userInput,
-              callSid: ws.connectionLabel,
-            });
+            console.log({ user: userInput });
             agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
           }
         );

@@ -52,13 +52,17 @@ app.post("/callupdate", async (req, res) => {
   const callSevice = getCallService();
 
   if (callTerminationStatuses.includes(req.body.CallStatus)) {
-    await callSevice.updateCall(req.body.CallSid, {
-      callStatus: req.body.CallStatus,
-      callEndedByWhom: CALL_ENDED_BY_WHOM.CALL_TO,
-      callApplicationStatus: CALL_APPLICATION_STATUS.NA,
-      callEndReason:
-        req.body.CallStatus === "completed" ? "NA" : "Call was not Accepted.",
-    });
+    await callSevice.updateCall(
+      req.body.CallSid,
+      {
+        callStatus: req.body.CallStatus,
+        callEndedByWhom: CALL_ENDED_BY_WHOM.CALL_TO,
+        callApplicationStatus: CALL_APPLICATION_STATUS.NA,
+        callEndReason:
+          req.body.CallStatus === "completed" ? "NA" : "Call was not Accepted.",
+      },
+      true
+    );
   } else {
     callSevice.updateCall(req.body.CallSid, {
       callStatus: req.body.CallStatus,

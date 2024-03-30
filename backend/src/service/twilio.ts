@@ -49,12 +49,16 @@ const hangupCall = async (
     const isCallTerminated = await callService.hasCallFinished(callSid);
     if (isCallTerminated) return;
     await twilioClient.calls(callSid).update({ status: "completed" });
-    await callService.updateCall(callSid, {
-      callApplicationStatus: CALL_APPLICATION_STATUS.NA,
-      callEndedByWhom: callEndedBy,
-      callEndReason: callEndReason,
-      callStatus: "completed",
-    });
+    await callService.updateCall(
+      callSid,
+      {
+        callApplicationStatus: CALL_APPLICATION_STATUS.NA,
+        callEndedByWhom: callEndedBy,
+        callEndReason: callEndReason,
+        callStatus: "completed",
+      },
+      true
+    );
     console.info(`Call ${callSid} ended by ${CALL_ENDED_BY_WHOM.BOT}.`);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {
@@ -75,7 +79,7 @@ const updateInProgessCall = async (
     }
     if (responseType === ResponseType.END_CALL) {
       //INFO: content is not spoken out if response type is end call
-      await hangupCall(callSid, CALL_ENDED_BY_WHOM.BOT);
+      await hangupCall(callSid, CALL_ENDED_BY_WHOM.BOT, message.content);
       return;
     }
     const response = new VoiceResponse();

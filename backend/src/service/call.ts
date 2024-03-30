@@ -81,12 +81,23 @@ export class CallService {
     return null;
   }
 
-  async updateCall(callSid: string, updatedCall: Partial<Call>) {
+  async updateCall(
+    callSid: string,
+    updatedCall: Partial<Call>,
+    isCallStatusUpdate: boolean = false
+  ) {
     if (!this.isRedisConnected || !this.redisClient) {
       throw new Error("Redis client is not connected");
     }
     const existingCall = await this.getCall(callSid);
+
     if (existingCall) {
+      const isCallEndedByAvailable =
+        existingCall?.callEndedByWhom !== CALL_ENDED_BY_WHOM.NA;
+      if (isCallStatusUpdate && isCallEndedByAvailable) {
+        console.info(`Call End Reason Already Available cannot Update`);
+        return;
+      }
       const mergedCall = { ...existingCall, ...updatedCall };
       await this.redisClient.hSet(callSid, {
         endpointing: mergedCall.endpointing.toString(),
@@ -96,9 +107,10 @@ export class CallService {
         callEndedByWhom: mergedCall.callEndedByWhom,
         callApplicationStatus: mergedCall.callApplicationStatus,
       });
-      console.info(
-        `Updated: ${callSid} with ${Object.keys(updatedCall).join(" ")}`
-      );
+
+      Object.entries(updatedCall).forEach(([key, value]) => {
+        console.info(`Updated: ${callSid} with ${key} for ${value}.`);
+      });
       if (updatedCall.callTranscription) {
         for (const message of updatedCall.callTranscription) {
           await this.redisClient.rPush(
@@ -164,17 +176,17 @@ export class CallService {
 
   private async updateCallModelAfterTimeout(callSid: string): Promise<void> {
     console.info(`Using ${MODELS.GPT_3_5_TUBRO} Model for ${callSid}.`);
-    console.info(
-      `Using Endpointing of ${ENDPOINTING.INITAL} ms for ${callSid}.`
-    );
+    // console.info(
+    //   `Using Endpointing of ${ENDPOINTING.INITAL} ms for ${callSid}.`
+    // );
 
     setTimeout(async () => {
       console.info(
         `${TIMEOUT} ms of timer done. Switching from: ${MODELS.GPT_3_5_TUBRO} to: ${MODELS.GPT4_1106_PREVIEW}.`
       );
-      console.info(
-        `Using Endpointing of ${ENDPOINTING.AFTER_TIMEOUT} ms for ${callSid}.`
-      );
+      // console.info(
+      //   `Using Endpointing of ${ENDPOINTING.AFTER_TIMEOUT} ms for ${callSid}.`
+      // );
 
       await this.updateCall(callSid, {
         model: MODELS.GPT4_1106_PREVIEW,
