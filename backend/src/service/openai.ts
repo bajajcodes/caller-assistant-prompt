@@ -84,7 +84,7 @@ const agent = async (
     const assistantResponse = JSON.parse(assistantPrompt) as AssistantResponse;
     const assistantRoleMessage: ChatCompletionAssistantMessageParam = {
       role: "assistant",
-      content: assistantPrompt,
+      content: assistantResponse.content,
     };
 
     console.log({

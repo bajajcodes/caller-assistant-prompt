@@ -74,7 +74,7 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        endpointing: 15,
+        // endpointing: 10,
         // interim_results: true,
         // utterance_end_ms: 1000,
       });
@@ -84,8 +84,6 @@ const startServer = async () => {
       ws.on("message", async (data: $TSFixMe) => {
         const twilioMessage = JSON.parse(data);
         const event = twilioMessage["event"];
-        const isDeepgramConnectionReady =
-          deepgramConnection.getReadyState() === 1;
 
         if (event === "connected") {
           console.info("Received a Twilio Connected Event");
@@ -119,6 +117,8 @@ const startServer = async () => {
             );
             ws.close();
           } else {
+            const isDeepgramConnectionReady =
+              deepgramConnection.getReadyState() === 1;
             if (isDeepgramConnectionReady) {
               const media = twilioMessage["media"];
               const audio = Buffer.from(media["payload"], "base64");
@@ -179,10 +179,6 @@ const startServer = async () => {
             const transcript = transcription.channel.alternatives[0].transcript;
             console.info({ transcript });
 
-            if (!transcript) {
-              return;
-            }
-
             //info: get silent assuimg it's an interrupt
             // console.info("Interrupting Bot to get Silent");
             // updateInProgessCall(ws.connectionLabel!, {
@@ -190,25 +186,23 @@ const startServer = async () => {
             //   responseType: ResponseType.SAY_FOR_VOICE,
             // });
 
-            if (transcript && !transcription.speech_final) {
-              transcriptCollection.push(transcript);
-              return;
-            }
-
             if (
               transcript &&
               transcription.speech_final &&
-              !PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
+              PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
             ) {
               transcriptCollection.push(transcript);
-              return;
+              const userInput = transcriptCollection.join("");
+              transcriptCollection = [];
+              console.log({ user: userInput });
+              agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
+            } else if (
+              transcript &&
+              (!transcription.speech_final ||
+                !PUNCTUATION_TERMINATORS.includes(transcript.slice(-1)))
+            ) {
+              transcriptCollection.push(transcript);
             }
-
-            transcriptCollection.push(transcript);
-            const userInput = transcriptCollection.join("");
-            transcriptCollection = [];
-            console.log({ user: userInput });
-            agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
           }
         );
 

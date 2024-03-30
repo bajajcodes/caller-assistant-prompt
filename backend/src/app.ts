@@ -26,6 +26,29 @@ app.use(async (req, _, next) => {
 
 app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
+app.get("/calllog/:callsid", async (req, res) => {
+  const callSid = req.params.callsid;
+  const callService = getCallService();
+  const call = await callService.getCall(callSid);
+  const callTranscription = call?.callTranscription.filter(
+    (transcript) =>
+      transcript.role === "user" || transcript.role === "assistant"
+  );
+
+  if (!call)
+    return res
+      .status(404)
+      .json({ message: `Call Details not found for Sid: ${callSid}.` });
+  return res.json({
+    callSid: call.callSid,
+    callStatus: call.callStatus,
+    callEndedByWhom: call.callEndedByWhom,
+    callEndReason: call.callEndReason,
+    callApplicationStatus: call.callApplicationStatus,
+    callTranscription,
+  });
+});
+
 app.post("/batch", async (req, res) => {
   const payload = req.body;
   //empty array is valid payload
