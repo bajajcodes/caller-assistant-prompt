@@ -119,13 +119,13 @@ const startServer = async () => {
           } else {
             const isDeepgramConnectionReady =
               deepgramConnection.getReadyState() === 1;
+            const media = twilioMessage["media"];
+            const audio = Buffer.from(media["payload"], "base64");
+            messageQueue.push(audio);
             if (isDeepgramConnectionReady) {
-              const media = twilioMessage["media"];
-              const audio = Buffer.from(media["payload"], "base64");
-              deepgramConnection.send(audio);
-            } else {
-              //TODO: use dropped audio packets
-              messageQueue.push(data);
+              const combinedAudioBuffer = Buffer.concat(messageQueue);
+              messageQueue = [];
+              deepgramConnection.send(combinedAudioBuffer);
             }
           }
         }
@@ -156,13 +156,7 @@ const startServer = async () => {
 
       deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
         console.info("Deepgram connection is ready and opened.");
-        console.info(
-          `Message Queue total ${messageQueue.length} audio packets has been lost.`
-        );
-        if (messageQueue.length > 0) {
-          //TODO: use message queue packets
-          messageQueue = [];
-        }
+
         deepgramConnection.on(
           LiveTranscriptionEvents.Transcript,
           async (transcription: LiveTranscriptionEvent) => {
