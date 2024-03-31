@@ -33,11 +33,15 @@ const connectTwilio = () => {
   }
 };
 
-const hangupCall = async (
-  callSid: string | null | undefined,
-  callEndedBy: CALL_ENDED_BY_WHOM,
-  callEndReason: string = "NA"
-) => {
+const hangupCall = async ({
+  callSid,
+  callEndedBy,
+  callEndReason = "NA",
+}: {
+  callSid?: string | null;
+  callEndedBy: CALL_ENDED_BY_WHOM;
+  callEndReason?: string;
+}) => {
   try {
     if (!callSid) {
       console.info(
@@ -79,7 +83,12 @@ const updateInProgessCall = async (
     }
     if (responseType === ResponseType.END_CALL) {
       //INFO: content is not spoken out if response type is end call
-      await hangupCall(callSid, CALL_ENDED_BY_WHOM.BOT, message.content);
+      //TODO: end the call when content is spoken out
+      await hangupCall({
+        callSid,
+        callEndedBy: CALL_ENDED_BY_WHOM.BOT,
+        callEndReason: message.content,
+      });
       return;
     }
     const response = new VoiceResponse();
@@ -112,11 +121,11 @@ const updateInProgessCall = async (
       callSid,
       reason,
     });
-    await hangupCall(
+    await hangupCall({
       callSid,
-      CALL_ENDED_BY_WHOM.ERROR,
-      `Failed to Update Call: ${reason}`
-    );
+      callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+      callEndReason: `Failed to Update Call: ${reason}`,
+    });
   }
 };
 

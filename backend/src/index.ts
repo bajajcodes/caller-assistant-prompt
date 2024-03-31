@@ -144,11 +144,11 @@ const startServer = async () => {
           deepgramConnection.finish();
         }
         if (ws.connectionLabel) {
-          await hangupCall(
-            ws.connectionLabel,
-            CALL_ENDED_BY_WHOM.ERROR,
-            `Websocket Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`
-          );
+          await hangupCall({
+            callSid: ws.connectionLabel,
+            callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+            callEndReason: `Websocket Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`,
+          });
         } else {
           console.error({ error: reason });
         }
@@ -171,8 +171,12 @@ const startServer = async () => {
             }
 
             const transcript = transcription.channel.alternatives[0].transcript;
-            console.info({ transcript });
-
+            // console.info({ transcript });
+            // console.info({
+            //   is_interrupt:
+            //     transcription.channel.alternatives[0].confidence > 0.9,
+            //   confidence: transcription.channel.alternatives[0].confidence,
+            // });
             //info: get silent assuimg it's an interrupt
             // console.info("Interrupting Bot to get Silent");
             // updateInProgessCall(ws.connectionLabel!, {
@@ -208,11 +212,11 @@ const startServer = async () => {
           LiveTranscriptionEvents.Error,
           async (err: $TSFixMe) => {
             const reason = err?.message || "Something Went Wrong";
-            await hangupCall(
-              ws.connectionLabel,
-              CALL_ENDED_BY_WHOM.ERROR,
-              `Deepgram Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`
-            );
+            await hangupCall({
+              callSid: ws.connectionLabel,
+              callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+              callEndReason: `Deepgram Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`,
+            });
           }
         );
       });

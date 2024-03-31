@@ -107,11 +107,11 @@ const agent = async (
       message: "Failed to get LLM or Assistant Response.",
       reason,
     });
-    await hangupCall(
+    await hangupCall({
       callSid,
-      CALL_ENDED_BY_WHOM.ERROR,
-      `Failed to get LLM or Assistant Response: ${callSid} for ${reason}.`
-    );
+      callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+      callEndReason: `Failed to get LLM or Assistant Response: ${callSid} for ${reason}.`,
+    });
   }
 };
 

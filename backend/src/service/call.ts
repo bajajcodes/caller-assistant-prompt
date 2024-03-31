@@ -41,7 +41,7 @@ export class CallService {
       callSid,
       callStatus: "queued",
       callEndReason: "",
-      model: MODELS.GPT_3_5_TUBRO,
+      model: MODELS.GPT4_1106_PREVIEW,
       callEndedByWhom: CALL_ENDED_BY_WHOM.NA,
       callApplicationStatus: CALL_APPLICATION_STATUS.NA,
       callTranscription: [],
