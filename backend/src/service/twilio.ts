@@ -63,7 +63,6 @@ const hangupCall = async ({
       },
       true
     );
-    console.info(`Call ${callSid} ended by ${CALL_ENDED_BY_WHOM.BOT}.`);
     console.info("Hangup Call Done.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;

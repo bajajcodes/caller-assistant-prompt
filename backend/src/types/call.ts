@@ -21,7 +21,6 @@ export enum CALL_ENDED_BY_WHOM {
 }
 
 export interface Call {
-  endpointing: number;
   callSid: string;
   callStatus: CallStatus;
   callEndReason: string;

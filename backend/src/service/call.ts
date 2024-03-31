@@ -7,7 +7,7 @@ import {
   Call,
   Message,
 } from "types/call";
-import { ENDPOINTING, MODELS } from "types/openai";
+import { MODELS } from "types/openai";
 import { LLM_MODEL_SWITCH_DURATION } from "utils/config";
 
 const TIMEOUT = LLM_MODEL_SWITCH_DURATION
@@ -37,7 +37,6 @@ export class CallService {
     }
 
     const initialCall: Call = {
-      endpointing: 25,
       callSid,
       callStatus: "queued",
       callEndReason: "",
@@ -48,7 +47,6 @@ export class CallService {
     };
 
     await this.redisClient.hSet(callSid, {
-      endpointing: initialCall.endpointing.toString(),
       callStatus: initialCall.callStatus,
       callEndReason: initialCall.callEndReason,
       model: initialCall.model,
@@ -74,7 +72,6 @@ export class CallService {
 
       return {
         ...callData,
-        endpointing: parseInt(callData.endpointing),
         callTranscription,
       } as Call;
     }
@@ -100,7 +97,6 @@ export class CallService {
       }
       const mergedCall = { ...existingCall, ...updatedCall };
       await this.redisClient.hSet(callSid, {
-        endpointing: mergedCall.endpointing.toString(),
         callStatus: mergedCall.callStatus,
         callEndReason: mergedCall.callEndReason,
         model: mergedCall.model,
@@ -176,21 +172,14 @@ export class CallService {
 
   private async updateCallModelAfterTimeout(callSid: string): Promise<void> {
     console.info(`Using ${MODELS.GPT_3_5_TUBRO} Model for ${callSid}.`);
-    // console.info(
-    //   `Using Endpointing of ${ENDPOINTING.INITAL} ms for ${callSid}.`
-    // );
 
     setTimeout(async () => {
       console.info(
         `${TIMEOUT} ms of timer done. Switching from: ${MODELS.GPT_3_5_TUBRO} to: ${MODELS.GPT4_1106_PREVIEW}.`
       );
-      // console.info(
-      //   `Using Endpointing of ${ENDPOINTING.AFTER_TIMEOUT} ms for ${callSid}.`
-      // );
 
       await this.updateCall(callSid, {
         model: MODELS.GPT4_1106_PREVIEW,
-        endpointing: ENDPOINTING.AFTER_TIMEOUT,
       });
     }, TIMEOUT);
   }

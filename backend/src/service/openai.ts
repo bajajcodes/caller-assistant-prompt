@@ -87,20 +87,15 @@ const agent = async (
       content: assistantResponse.content,
     };
 
+    await Promise.all([
+      callService.storeMessage(callSid, userRoleMessage),
+      callService.storeMessage(callSid, assistantRoleMessage),
+    ]);
+    onUpdate(assistantResponse, callSid);
+
     console.log({
       bot: assistantResponse.content,
     });
-    console.log({
-      model: completeion.model,
-      responseType: assistantResponse.responseType,
-    });
-
-    await callService.storeMessage(callSid, userRoleMessage);
-    await callService.storeMessage(callSid, assistantRoleMessage);
-    console.info(
-      `CallSid: ${callSid} Chat Messages length is ${chatMessages.length + 1}`
-    );
-    onUpdate(assistantResponse, callSid);
   } catch (err: $TSFixMe) {
     const reason = err?.message;
     console.error({
