@@ -12,7 +12,7 @@ import { connectRedis, redisClient } from "service/redis";
 import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
 import { CALL_ENDED_BY_WHOM } from "types/call";
 import { $TSFixMe } from "types/common";
-import { AssistantResponse, ResponseType } from "types/openai";
+import { AssistantResponse } from "types/openai";
 import { PORT } from "utils/config";
 import WebSocket, { WebSocketServer } from "ws";
 import app from "./app";
@@ -25,11 +25,11 @@ const assistantMessages: Array<{
   response: AssistantResponse;
   callSid: string;
 }> = [];
-const messageQueue = new EventEmitter();
+const messageAudioBuffer = new EventEmitter();
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const port = PORT || 3000;
 let callService: CallService;
-let previousReponseType: ResponseType;
+// let previousReponseType: ResponseType;
 
 export function getCallService(): CallService {
   if (!callService) {
@@ -55,7 +55,7 @@ const enqueueAssistantMessage = (
   callSid: string
 ) => {
   assistantMessages.push({ response: assitantResponse, callSid });
-  messageQueue.emit("new_message");
+  messageAudioBuffer.emit("new_message");
 };
 
 const startServer = async () => {
@@ -75,9 +75,8 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        endpointing: 10,
       });
-      let messageQueue: Array<Buffer> = [];
+      const messageAudioBuffer: Array<Buffer> = [];
       let transcriptCollection: Array<string> = [];
 
       ws.on("message", async (data: $TSFixMe) => {
@@ -100,14 +99,14 @@ const startServer = async () => {
             deepgramConnection.getReadyState() === 1;
           const media = twilioMessage["media"];
           const audio = Buffer.from(media["payload"], "base64");
+          messageAudioBuffer.push(audio);
           if (isDeepgramConnectionReady) {
-            if (messageQueue.length > 0) {
-              messageQueue.forEach((msg) => deepgramConnection.send(msg));
-              messageQueue = [];
+            while (messageAudioBuffer.length) {
+              const audio = messageAudioBuffer.shift();
+              if (audio) {
+                deepgramConnection.send(audio);
+              }
             }
-            deepgramConnection.send(audio);
-          } else {
-            messageQueue.push(audio);
           }
         }
       });
@@ -146,14 +145,14 @@ const startServer = async () => {
           LiveTranscriptionEvents.Transcript,
           async (transcription: LiveTranscriptionEvent) => {
             const transcript = transcription.channel.alternatives[0].transcript;
-            const isInterrupt =
-              transcription.channel.alternatives[0].confidence > 0.9;
-            console.info({ transcript });
-            console.info({
-              isInterrupt,
-              confidence: transcription.channel.alternatives[0].confidence,
-              previousReponseType,
-            });
+            // const isInterrupt =
+            //   transcription.channel.alternatives[0].confidence > 0.9;
+            // console.info({
+            //   transcript,
+            // isInterrupt,
+            // confidence: transcription.channel.alternatives[0].confidence,
+            // previousReponseType,
+            // });
             // if (
             //   isInterrupt &&
             //   previousReponseType !== ResponseType.SEND_DIGITS
@@ -166,29 +165,37 @@ const startServer = async () => {
             // } else {
             //   console.info("NOT, Interrupting Bot to get Silent.");
             // }
+            console.info({ transcript });
+            if (transcript) {
+              transcriptCollection.push(transcript);
+            }
 
             if (
-              transcript &&
               transcription.speech_final &&
               PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
             ) {
-              transcriptCollection.push(transcript);
               const userInput = transcriptCollection.join("");
               transcriptCollection = [];
-              console.log({ user: userInput });
+              console.log({
+                user: userInput,
+                when: "When Deepgram Connection opened.",
+              });
               agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
-            } else if (
-              transcript &&
-              (!transcription.speech_final ||
-                !PUNCTUATION_TERMINATORS.includes(transcript.slice(-1)))
-            ) {
-              transcriptCollection.push(transcript);
             }
           }
         );
 
         deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
           console.info("Deepgram Connection closed.");
+          const userInput = transcriptCollection.join("");
+          transcriptCollection = [];
+          if (userInput.trim().length > 0) {
+            console.log({
+              user: userInput,
+              when: "When Deepgram Connection closed.",
+            });
+            agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
+          }
         });
 
         deepgramConnection.on(
@@ -241,11 +248,11 @@ const startProcessingAssistantMessages = async () => {
           );
           return;
         }
-        previousReponseType = message.response.responseType;
+        // previousReponseType = message.response.responseType;
         updateInProgessCall(callSid, message.response);
       } else {
         await new Promise((resolve) =>
-          messageQueue.once("new_message", resolve)
+          messageAudioBuffer.once("new_message", resolve)
         );
       }
     }

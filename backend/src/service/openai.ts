@@ -95,6 +95,7 @@ const agent = async (
 
     console.log({
       bot: assistantResponse.content,
+      reponseType: assistantResponse.responseType,
     });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
