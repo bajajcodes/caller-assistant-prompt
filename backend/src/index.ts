@@ -12,7 +12,7 @@ import { connectRedis, redisClient } from "service/redis";
 import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
 import { CALL_ENDED_BY_WHOM } from "types/call";
 import { $TSFixMe } from "types/common";
-import { AssistantResponse } from "types/openai";
+import { AssistantResponse, ResponseType } from "types/openai";
 import { PORT } from "utils/config";
 import WebSocket, { WebSocketServer } from "ws";
 import app from "./app";
@@ -29,6 +29,7 @@ const messageQueue = new EventEmitter();
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const port = PORT || 3000;
 let callService: CallService;
+let previousReponseType: ResponseType;
 
 export function getCallService(): CallService {
   if (!callService) {
@@ -74,9 +75,7 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        // endpointing: 10,
-        // interim_results: true,
-        // utterance_end_ms: 1000,
+        endpointing: 10,
       });
       let messageQueue: Array<Buffer> = [];
       let transcriptCollection: Array<string> = [];
@@ -92,41 +91,23 @@ const startServer = async () => {
         if (event === "start") {
           const callSid = twilioMessage.start.callSid;
           ws.connectionLabel = callSid;
-          const shouldNotSendPackets =
-            await callService.hasCallFinished(callSid);
-          //There is no point in sending more packets if call has finished/terminated
-          if (shouldNotSendPackets) {
-            console.info(
-              `Closing WS connection and Call: ${callSid} For event type start.`
-            );
-            ws.close();
-          }
           const streamSid = twilioMessage.streamSid;
           console.info(`Starting Media Stream ${streamSid} for ${callSid}`);
         }
 
         if (event === "media") {
-          const shouldNotSendPackets = await callService.hasCallFinished(
-            ws.connectionLabel || ""
-          );
-
-          //There is no point in sending more packets if call has finished/terminated
-          if (shouldNotSendPackets) {
-            console.info(
-              `Closing WS connection and Call: ${ws.connectionLabel} For event type media.`
-            );
-            ws.close();
-          } else {
-            const isDeepgramConnectionReady =
-              deepgramConnection.getReadyState() === 1;
-            const media = twilioMessage["media"];
-            const audio = Buffer.from(media["payload"], "base64");
-            messageQueue.push(audio);
-            if (isDeepgramConnectionReady) {
-              const combinedAudioBuffer = Buffer.concat(messageQueue);
+          const isDeepgramConnectionReady =
+            deepgramConnection.getReadyState() === 1;
+          const media = twilioMessage["media"];
+          const audio = Buffer.from(media["payload"], "base64");
+          if (isDeepgramConnectionReady) {
+            if (messageQueue.length > 0) {
+              messageQueue.forEach((msg) => deepgramConnection.send(msg));
               messageQueue = [];
-              deepgramConnection.send(combinedAudioBuffer);
             }
+            deepgramConnection.send(audio);
+          } else {
+            messageQueue.push(audio);
           }
         }
       });
@@ -140,17 +121,21 @@ const startServer = async () => {
 
       ws.on("error", async (err: $TSFixMe) => {
         const reason = err?.message || "Something Went Wrong";
+        console.error({ error: reason });
+        if (ws.connectionLabel) {
+          const isCallFinished = await callService.hasCallFinished(
+            ws.connectionLabel
+          );
+          if (!isCallFinished) {
+            await hangupCall({
+              callSid: ws.connectionLabel,
+              callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+              callEndReason: `Websocket Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`,
+            });
+          }
+        }
         if (deepgramConnection) {
           deepgramConnection.finish();
-        }
-        if (ws.connectionLabel) {
-          await hangupCall({
-            callSid: ws.connectionLabel,
-            callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
-            callEndReason: `Websocket Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`,
-          });
-        } else {
-          console.error({ error: reason });
         }
       });
 
@@ -160,29 +145,27 @@ const startServer = async () => {
         deepgramConnection.on(
           LiveTranscriptionEvents.Transcript,
           async (transcription: LiveTranscriptionEvent) => {
-            if (ws.connectionLabel) {
-              const shouldNotSendPackets = await callService.hasCallFinished(
-                ws.connectionLabel
-              );
-              if (shouldNotSendPackets) {
-                console.info("Cannot Send Transcritpion call is terminated.");
-                return;
-              }
-            }
-
             const transcript = transcription.channel.alternatives[0].transcript;
-            // console.info({ transcript });
-            // console.info({
-            //   is_interrupt:
-            //     transcription.channel.alternatives[0].confidence > 0.9,
-            //   confidence: transcription.channel.alternatives[0].confidence,
-            // });
-            //info: get silent assuimg it's an interrupt
-            // console.info("Interrupting Bot to get Silent");
-            // updateInProgessCall(ws.connectionLabel!, {
-            //   content: "",
-            //   responseType: ResponseType.SAY_FOR_VOICE,
-            // });
+            const isInterrupt =
+              transcription.channel.alternatives[0].confidence > 0.9;
+            console.info({ transcript });
+            console.info({
+              isInterrupt,
+              confidence: transcription.channel.alternatives[0].confidence,
+              previousReponseType,
+            });
+            // if (
+            //   isInterrupt &&
+            //   previousReponseType !== ResponseType.SEND_DIGITS
+            // ) {
+            //   console.info("Interrupting Bot to get Silent.");
+            //   updateInProgessCall(ws.connectionLabel!, {
+            //     content: "",
+            //     responseType: ResponseType.SAY_FOR_VOICE,
+            //   });
+            // } else {
+            //   console.info("NOT, Interrupting Bot to get Silent.");
+            // }
 
             if (
               transcript &&
@@ -212,11 +195,19 @@ const startServer = async () => {
           LiveTranscriptionEvents.Error,
           async (err: $TSFixMe) => {
             const reason = err?.message || "Something Went Wrong";
-            await hangupCall({
-              callSid: ws.connectionLabel,
-              callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
-              callEndReason: `Deepgram Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`,
-            });
+            console.info({ error: reason });
+            if (ws.connectionLabel) {
+              const isCallFinished = await callService.hasCallFinished(
+                ws.connectionLabel
+              );
+              if (!isCallFinished) {
+                await hangupCall({
+                  callSid: ws.connectionLabel,
+                  callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+                  callEndReason: `Deepgram Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`,
+                });
+              }
+            }
           }
         );
       });
@@ -243,6 +234,14 @@ const startProcessingAssistantMessages = async () => {
           console.error("Call Sid is Missing.");
           return;
         }
+        const shouldNotSendPackets = await callService.hasCallFinished(callSid);
+        if (shouldNotSendPackets) {
+          console.info(
+            `Cannot Update Terminated Call: ${callSid} for ${message.response.content}`
+          );
+          return;
+        }
+        previousReponseType = message.response.responseType;
         updateInProgessCall(callSid, message.response);
       } else {
         await new Promise((resolve) =>
