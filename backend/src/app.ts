@@ -4,9 +4,18 @@ import express from "express";
 import { getCallService } from "index";
 import { redisClient } from "service/redis";
 import { makeacall } from "service/twilio";
+import { CALL_APPLICATION_STATUS, CALL_ENDED_BY_WHOM } from "types/call";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
 import { STORE_KEYS } from "types/redis";
+
+const callTerminationStatuses = [
+  "completed",
+  "busy",
+  "failed",
+  "no-answer",
+  "canceled",
+];
 
 const app: Express = express();
 
@@ -76,17 +85,25 @@ app.post("/callstatusupdate", async (req, res) => {
   const callSevice = getCallService();
   //TODO: end call when call status is terminated
 
-  callSevice.updateCall(req.body.CallSid, {
-    callStatus: req.body.CallStatus,
-  });
+  if (callTerminationStatuses.includes(req.body.CallStatus)) {
+    await callSevice.updateCall(
+      req.body.CallSid,
+      {
+        callStatus: req.body.CallStatus,
+        callEndedByWhom: CALL_ENDED_BY_WHOM.CALL_TO,
+        callApplicationStatus: CALL_APPLICATION_STATUS.NA,
+        callEndReason:
+          req.body.CallStatus === "completed" ? "NA" : "Call was not Accepted.",
+      },
+      true
+    );
+    callSevice.setCallSid(undefined);
+  } else {
+    callSevice.updateCall(req.body.CallSid, {
+      callStatus: req.body.CallStatus,
+    });
+  }
 
-  return res.status(200).send();
-});
-
-app.post("/callupdate", async (req, res) => {
-  console.info({
-    callupdate: JSON.stringify(req.body),
-  });
   return res.status(200).send();
 });
 

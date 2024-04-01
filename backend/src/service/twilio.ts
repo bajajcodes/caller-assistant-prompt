@@ -116,8 +116,6 @@ const updateInProgessCall = async (
     const twiml = response.toString();
     await twilioClient.calls(callSid).update({
       twiml,
-      statusCallbackMethod: "POST",
-      statusCallback: `https://${HOST}/callupdate`,
     });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
