@@ -66,7 +66,7 @@ app.post("/makeacall", async (req, res) => {
   }
 });
 
-app.post("/callupdate", async (req, res) => {
+app.post("/callstatusupdate", async (req, res) => {
   console.info(
     "Call Status Update:",
     req.body.CallStatus,
@@ -80,6 +80,13 @@ app.post("/callupdate", async (req, res) => {
     callStatus: req.body.CallStatus,
   });
 
+  return res.status(200).send();
+});
+
+app.post("/callupdate", async (req, res) => {
+  console.info({
+    callupdate: JSON.stringify(req.body),
+  });
   return res.status(200).send();
 });
 

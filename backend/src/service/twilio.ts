@@ -51,7 +51,10 @@ const hangupCall = async ({
     }
     const callService = getCallService();
     const isCallTerminated = await callService.hasCallFinished(callSid);
-    if (isCallTerminated) return;
+    if (isCallTerminated) {
+      console.info(`twilio: call is already terminated, aborting hangup call.`);
+      return;
+    }
     await twilioClient.calls(callSid).update({ status: "completed" });
     await callService.updateCall(
       callSid,
@@ -63,6 +66,7 @@ const hangupCall = async ({
       },
       true
     );
+    callService.setCallSid(undefined);
     console.info("twilio: hangup call done.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
@@ -112,6 +116,8 @@ const updateInProgessCall = async (
     const twiml = response.toString();
     await twilioClient.calls(callSid).update({
       twiml,
+      statusCallbackMethod: "POST",
+      statusCallback: `https://${HOST}/callupdate`,
     });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
@@ -155,7 +161,7 @@ const makeacall = async (providerData: Record<string, string>) => {
       to: twilioCallToNumber,
       from: TWILIO_FROM_NUMBER,
       record: true,
-      statusCallback: `https://${HOST}/callupdate`,
+      statusCallback: `https://${HOST}/callstatusupdate`,
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     });

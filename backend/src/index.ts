@@ -14,7 +14,7 @@ import { WebSocketServer } from "ws";
 import app from "./app";
 
 export const messageQueue = new EventEmitter();
-const transcriptCollection: Array<string> = [];
+let transcriptCollection: Array<string> = [];
 const assistantMessages: Array<{
   response: AssistantResponse;
   callSid: string;
@@ -63,26 +63,30 @@ const startServer = async () => {
           LiveTranscriptionEvents.Transcript,
           async (transcription: LiveTranscriptionEvent) => {
             const transcript = transcription.channel.alternatives[0].transcript;
+            console.info({
+              transcript,
+              speechFinal: transcription.speech_final,
+              terminated: PUNCTUATION_TERMINATORS.includes(
+                transcript.slice(-1)
+              ),
+            });
 
             if (!transcript) return;
 
             if (transcript) {
-              console.info({
-                transcript,
-              });
               transcriptCollection.push(transcript);
             }
 
             if (
-              !transcription.speech_final ||
+              !transcription.speech_final &&
               !PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
             ) {
               return;
             }
 
             const userInput = transcriptCollection.join("");
-            transcriptCollection.splice(0, transcriptCollection.length);
-            console.info({ userInput, transcriptCollection });
+            transcriptCollection = [];
+            console.info({ userInput });
             agent(userInput, callService.callSid, enqueueAssistantMessage);
           }
         );

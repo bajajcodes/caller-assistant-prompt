@@ -28,7 +28,7 @@ export class CallService {
     this.isRedisConnected = true;
   }
 
-  public setCallSid(callSid: string) {
+  public setCallSid(callSid?: string) {
     this._callSid = callSid;
   }
 
@@ -49,7 +49,7 @@ export class CallService {
       callSid,
       callStatus: "queued",
       callEndReason: "",
-      model: MODELS.GPT_3_5_TUBRO,
+      model: MODELS.GPT4_1106_PREVIEW,
       callEndedByWhom: CALL_ENDED_BY_WHOM.NA,
       callApplicationStatus: CALL_APPLICATION_STATUS.NA,
       callTranscription: [],
@@ -65,7 +65,7 @@ export class CallService {
 
     await this.storeMessage(callSid, systemRoleMessage);
 
-    this.updateCallModelAfterTimeout(callSid);
+    // this.updateCallModelAfterTimeout(callSid);
     console.info(`callservice: call entry created for ${callSid}.`);
   }
 
