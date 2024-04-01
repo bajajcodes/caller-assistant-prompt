@@ -5,10 +5,11 @@ import {
 } from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
+import { RedisClientType } from "redis";
 import { CallService } from "service/call";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
-import { connectRedis, redisClient } from "service/redis";
+import { connectRedis } from "service/redis";
 import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
 import { CALL_ENDED_BY_WHOM } from "types/call";
 import { $TSFixMe } from "types/common";
@@ -38,15 +39,8 @@ export function getCallService(): CallService {
   return callService;
 }
 
-export async function initializeCallService() {
+export async function initializeCallService(redisClient: RedisClientType) {
   callService = new CallService();
-  await setCallServiceRedisClient();
-}
-
-export async function setCallServiceRedisClient() {
-  if (!redisClient) {
-    throw new Error("Redis client is not connected");
-  }
   callService.setRedisClient(redisClient);
 }
 
@@ -62,8 +56,6 @@ const startServer = async () => {
   try {
     const server = createServer(app);
     const wss = new WebSocketServer({ server });
-    await connectOpenAI();
-    await initializeCallService();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     wss.on("connection", (ws: CustomWebSocket) => {
       console.info("New Client Connected");
@@ -269,6 +261,7 @@ const startProcessingAssistantMessages = async () => {
   }
 };
 
+connectOpenAI();
 connectDeepgram();
 connectTwilio();
 connectRedis();
