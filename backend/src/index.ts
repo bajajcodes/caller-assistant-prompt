@@ -75,8 +75,8 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
-        utterance_end_ms: 2000,
-        interim_results: true,
+        // utterance_end_ms: 2000,
+        // interim_results: true,
       });
       const messageAudioBuffer: Array<Buffer> = [];
       let transcriptCollection: Array<string> = [];
@@ -102,11 +102,17 @@ const startServer = async () => {
           const media = twilioMessage["media"];
           const audio = Buffer.from(media["payload"], "base64");
           messageAudioBuffer.push(audio);
-          if (isDeepgramConnectionReady) {
-            while (messageAudioBuffer.length) {
-              const audio = messageAudioBuffer.shift();
-              if (audio) {
+          while (messageAudioBuffer.length && isDeepgramConnectionReady) {
+            const audio = messageAudioBuffer.shift();
+            if (audio) {
+              if (isDeepgramConnectionReady) {
                 deepgramConnection.send(audio);
+              } else {
+                //info: risky might reorder audio
+                //TODO: reuse the audio packet if deepgram connection is not ready
+                console.info(
+                  `Dropped Audio Packet/Buffer for ${ws.connectionLabel}.`
+                );
               }
             }
           }
@@ -152,7 +158,7 @@ const startServer = async () => {
             if (transcript) {
               transcriptCollection.push(transcript);
             }
-
+            //REF:https://developers.deepgram.com/docs/understand-endpointing-interim-results#using-endpointing-speech_final
             if (
               transcription.speech_final &&
               PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
