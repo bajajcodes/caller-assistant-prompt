@@ -69,7 +69,6 @@ const connectOpenAI = async () => {
 };
 
 const agent = async (
-  openai: OpenAI,
   userInput: string,
   onUpdate: (assistantPrompt: AssistantResponse) => void
 ): Promise<void> => {
@@ -80,7 +79,7 @@ const agent = async (
       content: userInput,
     });
     //TODO: test the function calls.
-    const completeion = await openai.chat.completions.create({
+    const completeion = await openaiClient.chat.completions.create({
       messages: chatMessages,
       model: LLM_MODEL,
       response_format: {

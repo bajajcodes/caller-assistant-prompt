@@ -1,4 +1,4 @@
-import { LiveTranscriptionEvents } from "@deepgram/sdk";
+import { LiveTranscriptionEvent, LiveTranscriptionEvents } from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
@@ -12,10 +12,11 @@ import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
 
-let transcriptCollection: Array<string> = [];
+const transcriptCollection: Array<string> = [];
 const assistantMessages: Array<AssistantResponse> = [];
 export const messageQueue = new EventEmitter();
 const port = PORT || 3000;
+const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 
 const enqueueAssistantMessage = (assitantResponse: AssistantResponse) => {
   assistantMessages.push(assitantResponse);
@@ -26,7 +27,6 @@ const startServer = async () => {
   try {
     const server = createServer(app);
     const wss = new WebSocketServer({ server });
-    const openaiClient = await connectOpenAI();
     wss.on("connection", (ws) => {
       console.info("New Client Connected");
       const deepgramConnection = deepgramClient.listen.live({
@@ -35,26 +35,46 @@ const startServer = async () => {
         encoding: "mulaw",
         sample_rate: 8000,
         channels: 1,
+        punctuate: true,
       });
 
       deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
         deepgramConnection.on(
           LiveTranscriptionEvents.Transcript,
-          async (transcription) => {
+          async (transcription: LiveTranscriptionEvent) => {
             const transcript = transcription.channel.alternatives[0].transcript;
 
+            if (!transcript) return;
+
             if (transcript) {
+              console.info({
+                transcript,
+              });
               transcriptCollection.push(transcript);
             }
-            console.info({ transcript });
-            if (transcriptCollection.length < 1 || transcript) {
+
+            if (
+              !transcription.speech_final ||
+              !PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
+            ) {
               return;
             }
 
+            // if (
+            //   transcription.speech_final &&
+            //   PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
+            // ) {
             const userInput = transcriptCollection.join("");
-            transcriptCollection = [];
-            console.info({ userInput });
-            await agent(openaiClient, userInput, enqueueAssistantMessage);
+            transcriptCollection.splice(0, transcriptCollection.length);
+            console.info({ userInput, transcriptCollection });
+            console.info({
+              IS_SPEECH_FINAL: transcription.speech_final,
+              IS_PUNCTUATION_TERMINATORS: PUNCTUATION_TERMINATORS.includes(
+                transcript.slice(-1)
+              ),
+            });
+            await agent(userInput, enqueueAssistantMessage);
+            // }
           }
         );
 
@@ -134,6 +154,7 @@ const startProcessingAssistantMessages = async () => {
   }
 };
 
+connectOpenAI();
 connectDeepgram();
 connectTwilio();
 connectRedis();
