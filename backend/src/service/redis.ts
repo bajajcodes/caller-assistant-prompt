@@ -1,3 +1,4 @@
+import { initializeCallService } from "index";
 import type { RedisClientType } from "redis";
 import { createClient } from "redis";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -15,10 +16,13 @@ const connectRedis = async () => {
       throw err?.message || "Redis Client Error";
     });
     await redisClient.connect();
-    console.info("Connected to Redis Client");
+    //INFO: temporarily forcibly setting redis client to call service
+    //TODO: create service to set redis client automatically
+    initializeCallService(redisClient);
+    console.info("redis: connected to redis client.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
-    console.error({ message: "Failed to Connect to Redis", reason });
+    console.error(`redis: ${reason || "failed to connect to redis"}.`);
     throw err;
   }
 };

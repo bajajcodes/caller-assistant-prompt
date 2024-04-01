@@ -1,25 +1,45 @@
 import { LiveTranscriptionEvent, LiveTranscriptionEvents } from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
+import { RedisClientType } from "redis";
+import { CallService } from "service/call";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
-import { connectRedis, redisClient } from "service/redis";
-import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
+import { connectRedis } from "service/redis";
+import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
-import { STORE_KEYS } from "types/redis";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
 
-const transcriptCollection: Array<string> = [];
-const assistantMessages: Array<AssistantResponse> = [];
 export const messageQueue = new EventEmitter();
+const transcriptCollection: Array<string> = [];
+const assistantMessages: Array<{
+  response: AssistantResponse;
+  callSid: string;
+}> = [];
 const port = PORT || 3000;
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
+let callService: CallService;
 
-const enqueueAssistantMessage = (assitantResponse: AssistantResponse) => {
-  assistantMessages.push(assitantResponse);
+export function getCallService(): CallService {
+  if (!callService) {
+    throw new Error("callservice: not initialized.");
+  }
+  return callService;
+}
+
+export async function initializeCallService(redisClient: RedisClientType) {
+  callService = new CallService();
+  callService.setRedisClient(redisClient);
+}
+
+const enqueueAssistantMessage = (
+  assitantResponse: AssistantResponse,
+  callSid: string
+) => {
+  assistantMessages.push({ response: assitantResponse, callSid });
   messageQueue.emit("new_message");
 };
 
@@ -60,21 +80,10 @@ const startServer = async () => {
               return;
             }
 
-            // if (
-            //   transcription.speech_final &&
-            //   PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
-            // ) {
             const userInput = transcriptCollection.join("");
             transcriptCollection.splice(0, transcriptCollection.length);
             console.info({ userInput, transcriptCollection });
-            console.info({
-              IS_SPEECH_FINAL: transcription.speech_final,
-              IS_PUNCTUATION_TERMINATORS: PUNCTUATION_TERMINATORS.includes(
-                transcript.slice(-1)
-              ),
-            });
-            await agent(userInput, enqueueAssistantMessage);
-            // }
+            agent(userInput, callService.callSid, enqueueAssistantMessage);
           }
         );
 
@@ -126,31 +135,37 @@ const startProcessingAssistantMessages = async () => {
   try {
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
-      const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
-      console.info({ callStatus });
-      if (callStatus === "completed") {
-        return await hangupCall(callSid);
-      }
-
-      if (callSid && assistantMessages.length > 0) {
+      if (assistantMessages.length > 0) {
         const message = assistantMessages.shift();
-        if (!message || !message.content) {
-          console.info("Cannot Push Empty Message to Update Call");
+        const callSid = message?.callSid;
+        if (!callSid) {
+          console.error(`assistant_messages: call sid is missing.`);
           return;
         }
-        await updateInProgessCall(callSid, message);
+        if (!message || !message.response.content) {
+          console.info(
+            "assistant_messages: cannot push empty message to update call."
+          );
+          return;
+        }
+        const shouldNotSendPackets = await callService.hasCallFinished(callSid);
+        if (shouldNotSendPackets) {
+          console.info(
+            `assistant_messages: cannot update terminated call: ${callSid} for ${message.response.content}.`
+          );
+          return;
+        }
+        await updateInProgessCall(callSid, message.response);
       } else {
         await new Promise((resolve) =>
           messageQueue.once("new_message", resolve)
         );
       }
-      if (!callSid) {
-        console.error("Call Sid is Missing.");
-      }
     }
-  } catch (err) {
-    console.error({ err });
+  } catch (err: $TSFixMe) {
+    console.error(
+      `assistant_messages: ${err?.message || "Failed to send assistant messages"}.`
+    );
   }
 };
 

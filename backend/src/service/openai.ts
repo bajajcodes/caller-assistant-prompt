@@ -1,84 +1,57 @@
+import { getCallService } from "index";
 import OpenAI from "openai";
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import {
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionSystemMessageParam,
+  ChatCompletionUserMessageParam,
+} from "openai/resources/index.mjs";
+import { CALL_ENDED_BY_WHOM } from "types/call";
 import { AssistantResponse, MODELS } from "types/openai";
-import { applicationStatusPrompt, systemPromptCollection } from "utils/data";
+import { systemPromptCollection } from "utils/data";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { $TSFixMe } from "../types/common";
-import { LLM_MODEL_SWITCH_DURATION, OPEN_AI_KEY } from "../utils/config";
+import { OPEN_AI_KEY } from "../utils/config";
+import { hangupCall } from "./twilio";
 
-let chatMessages: Array<ChatCompletionMessageParam> = [];
-let chatTranscription: Array<ChatCompletionMessageParam> = [];
-const timeout = LLM_MODEL_SWITCH_DURATION
-  ? parseInt(LLM_MODEL_SWITCH_DURATION, 10)
-  : 90000;
-let timeoutId: NodeJS.Timeout;
-let LLM_MODEL = MODELS.GPT_3_5_TUBRO;
 let openaiClient: OpenAI;
-
-export const resetLLMModelTimer = () => {
-  if (timeoutId) {
-    console.info(
-      `Resetting 1 minute 30 seconds of timer. Switching from: ${LLM_MODEL} to: ${MODELS.GPT_3_5_TUBRO}.`
-    );
-    LLM_MODEL = MODELS.GPT_3_5_TUBRO;
-    clearTimeout(timeoutId);
-  }
-  timeoutId = setTimeout(() => {
-    //INFO: closure get's applied here
-    console.info(
-      `1 minute 30 seconds of timer done. Switching from: ${LLM_MODEL} to: ${MODELS.GPT4_1106_PREVIEW}.`
-    );
-    LLM_MODEL = MODELS.GPT4_1106_PREVIEW;
-  }, timeout);
-  console.info("Switch LLM Model Timer Started.");
-};
-
-const intializeChatMessages = (providerData: string) => {
-  const data = {
-    label: "Data Presentation or Data",
-    instruction: providerData.replaceAll("\t", " "),
-  };
-  const content = [...systemPromptCollection, data].reduce(
-    (prompt, item) => `${prompt} ${item.label}:${item.instruction} `,
-    ""
-  );
-  chatMessages = [];
-  chatTranscription = [];
-  chatMessages.push({ role: "system", content });
-};
-
-const getChatMessages = () => chatMessages;
-const getChatTranscription = () => chatTranscription;
-const resetChatMessagesAndTranscription = () => {
-  chatMessages = [];
-  chatTranscription = [];
-};
 
 const connectOpenAI = async () => {
   try {
     if (!OPEN_AI_KEY) {
-      throw Error("Open AI Key is Missing");
+      throw Error("openai: key is missing.");
     }
     openaiClient = new OpenAI({ apiKey: OPEN_AI_KEY });
     return openaiClient;
   } catch (err: $TSFixMe) {
     const reason = err?.message;
-    console.error({ message: "Failed to Connect with OpenAI", reason });
+    console.error(`openai: ${reason || "failed to connect with openAI"}.`);
     throw err;
   }
 };
 
 const agent = async (
   userInput: string,
-  onUpdate: (assistantPrompt: AssistantResponse) => void
+  callSid: string | undefined,
+  onUpdate: (assistantPrompt: AssistantResponse, callSid: string) => void
 ): Promise<void> => {
   try {
-    chatMessages.push({ role: "user", content: userInput });
-    chatTranscription.push({
+    const callService = getCallService();
+    if (!callSid) throw Error(`openai: callsid ${callSid} is missing.`);
+    const chatMessages = await callService.getConversationHistory(callSid);
+    if (!chatMessages || chatMessages.length < 1)
+      throw Error(`openai: chat messages for callsid: ${callSid} is missing.`);
+    const userRoleMessage: ChatCompletionUserMessageParam = {
       role: "user",
       content: userInput,
-    });
-    //TODO: test the function calls.
+    };
+    chatMessages.push(userRoleMessage);
+    let LLM_MODEL = await callService.getCallModel(callSid);
+    if (!LLM_MODEL) {
+      LLM_MODEL = MODELS.GPT4_1106_PREVIEW;
+      console.info(
+        `openai: call not initialized with llm model, switching to llm model: ${MODELS.GPT4_1106_PREVIEW} for ${callSid}.`
+      );
+    }
     const completeion = await openaiClient.chat.completions.create({
       messages: chatMessages,
       model: LLM_MODEL,
@@ -91,65 +64,50 @@ const agent = async (
     const { message } = choice;
     const { content } = message;
     const assistantPrompt = content;
-    console.info({ assistantPrompt, model: completeion.model });
 
     if (!assistantPrompt) return;
     const assistantResponse = JSON.parse(assistantPrompt) as AssistantResponse;
-    chatMessages.push({ role: "assistant", content: assistantPrompt });
-    chatTranscription.push({
+    const assistantRoleMessage: ChatCompletionAssistantMessageParam = {
       role: "assistant",
       content: assistantResponse.content,
+    };
+
+    await Promise.all([
+      callService.storeMessage(callSid, userRoleMessage),
+      callService.storeMessage(callSid, assistantRoleMessage),
+    ]);
+    onUpdate(assistantResponse, callSid);
+
+    console.info({
+      bot: assistantResponse.content,
+      reponseType: assistantResponse.responseType,
     });
-    onUpdate(assistantResponse);
   } catch (err: $TSFixMe) {
     const reason = err?.message;
-    console.error({
-      message: "Failed to get LLM or Assistant Response.",
-      reason,
+    console.error(
+      `openai: ${reason || "failed to get llm or assistant Response"}.`
+    );
+    await hangupCall({
+      callSid,
+      callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+      callEndReason: `openai: ${reason || "failed to get llm or assistant Response"}.`,
     });
-    throw err;
   }
 };
 
-const applicationStatusAgent = async () => {
-  try {
-    const messages: Array<ChatCompletionMessageParam> = [
-      {
-        role: "system",
-        content: applicationStatusPrompt,
-      },
-      {
-        role: "user",
-        content: `${JSON.stringify(chatTranscription)}`,
-      },
-    ];
-    const completeion = await openaiClient.chat.completions.create({
-      messages,
-      model: MODELS.GPT4_1106_PREVIEW,
-      response_format: {
-        type: "json_object",
-      },
-    });
-    const [choice] = completeion.choices;
-    const { message } = choice;
-    const { content } = message;
-    return content;
-  } catch (err: $TSFixMe) {
-    const reason = err?.message;
-    console.error({
-      message: "Failed to get application status.",
-      reason,
-    });
-    throw err;
-  }
+const getSystemRoleMessage = (
+  providerData: Record<string, string>
+): ChatCompletionSystemMessageParam => {
+  const providerDataStringified = JSON.stringify(providerData);
+  const data = {
+    label: "Data Presentation or Data",
+    instruction: providerDataStringified.replaceAll("\t", " "),
+  };
+  const content = [...systemPromptCollection, data].reduce(
+    (prompt, item) => `${prompt} ${item.label}:${item.instruction} `,
+    ""
+  );
+  return { role: "system", content };
 };
 
-export {
-  agent,
-  applicationStatusAgent,
-  connectOpenAI,
-  getChatMessages,
-  getChatTranscription,
-  intializeChatMessages,
-  resetChatMessagesAndTranscription,
-};
+export { agent, connectOpenAI, getSystemRoleMessage };
