@@ -75,6 +75,8 @@ const startServer = async () => {
         sample_rate: 8000,
         channels: 1,
         punctuate: true,
+        utterance_end_ms: 2000,
+        interim_results: true,
       });
       const messageAudioBuffer: Array<Buffer> = [];
       let transcriptCollection: Array<string> = [];
@@ -145,26 +147,7 @@ const startServer = async () => {
           LiveTranscriptionEvents.Transcript,
           async (transcription: LiveTranscriptionEvent) => {
             const transcript = transcription.channel.alternatives[0].transcript;
-            // const isInterrupt =
-            //   transcription.channel.alternatives[0].confidence > 0.9;
-            // console.info({
-            //   transcript,
-            // isInterrupt,
-            // confidence: transcription.channel.alternatives[0].confidence,
-            // previousReponseType,
-            // });
-            // if (
-            //   isInterrupt &&
-            //   previousReponseType !== ResponseType.SEND_DIGITS
-            // ) {
-            //   console.info("Interrupting Bot to get Silent.");
-            //   updateInProgessCall(ws.connectionLabel!, {
-            //     content: "",
-            //     responseType: ResponseType.SAY_FOR_VOICE,
-            //   });
-            // } else {
-            //   console.info("NOT, Interrupting Bot to get Silent.");
-            // }
+
             console.info({ transcript });
             if (transcript) {
               transcriptCollection.push(transcript);
@@ -182,6 +165,25 @@ const startServer = async () => {
               });
               agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
             }
+
+            // const isInterrupt =
+            //   transcription.channel.alternatives[0].confidence > 0.9;
+            // console.info({
+            //   isInterrupt,
+            //   confidence: transcription.channel.alternatives[0].confidence,
+            //   previousReponseType,
+            // });
+
+            // if (
+            //   isInterrupt &&
+            //   previousReponseType !== ResponseType.SEND_DIGITS
+            // ) {
+            //   console.info("Interrupting Bot to get Silent.");
+            //   updateInProgessCall(ws.connectionLabel!, {
+            //     content: "",
+            //     responseType: ResponseType.SAY_FOR_VOICE,
+            //   });
+            // }
           }
         );
 
