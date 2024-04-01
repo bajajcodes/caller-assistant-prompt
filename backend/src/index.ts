@@ -1,98 +1,222 @@
-import { LiveTranscriptionEvents } from "@deepgram/sdk";
+import {
+  LiveClient,
+  LiveTranscriptionEvent,
+  LiveTranscriptionEvents,
+} from "@deepgram/sdk";
 import EventEmitter from "events";
 import { createServer } from "http";
+import { CallService } from "service/call";
 import { connectDeepgram, deepgramClient } from "service/deepgram";
 import { agent, connectOpenAI } from "service/openai";
 import { connectRedis, redisClient } from "service/redis";
-import { connectTwilio, updateInProgessCall } from "service/twilio";
+import { connectTwilio, hangupCall, updateInProgessCall } from "service/twilio";
+import { CALL_ENDED_BY_WHOM } from "types/call";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
-import { STORE_KEYS } from "types/redis";
 import { PORT } from "utils/config";
-import { WebSocketServer } from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 import app from "./app";
 
-let transcriptCollection: Array<string> = [];
-const assistantMessages: Array<AssistantResponse> = [];
-const messageQueue = new EventEmitter();
-const port = PORT || 3000;
+interface CustomWebSocket extends WebSocket {
+  connectionLabel?: string;
+}
 
-const enqueueAssistantMessage = (assitantResponse: AssistantResponse) => {
-  assistantMessages.push(assitantResponse);
-  messageQueue.emit("new_message");
+const assistantMessages: Array<{
+  response: AssistantResponse;
+  callSid: string;
+}> = [];
+const messageAudioBuffer = new EventEmitter();
+const PUNCTUATION_TERMINATORS = [".", "!", "?"];
+const port = PORT || 3000;
+let callService: CallService;
+// let previousReponseType: ResponseType;
+
+export function getCallService(): CallService {
+  if (!callService) {
+    throw new Error("CallService is not initialized");
+  }
+  return callService;
+}
+
+export async function initializeCallService() {
+  callService = new CallService();
+  await setCallServiceRedisClient();
+}
+
+export async function setCallServiceRedisClient() {
+  if (!redisClient) {
+    throw new Error("Redis client is not connected");
+  }
+  callService.setRedisClient(redisClient);
+}
+
+const enqueueAssistantMessage = (
+  assitantResponse: AssistantResponse,
+  callSid: string
+) => {
+  assistantMessages.push({ response: assitantResponse, callSid });
+  messageAudioBuffer.emit("new_message");
 };
 
 const startServer = async () => {
   try {
     const server = createServer(app);
     const wss = new WebSocketServer({ server });
-    const openaiClient = await connectOpenAI();
-    wss.on("connection", (ws) => {
+    await connectOpenAI();
+    await initializeCallService();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    wss.on("connection", (ws: CustomWebSocket) => {
       console.info("New Client Connected");
-      const deepgramConnection = deepgramClient.listen.live({
+
+      const deepgramConnection: LiveClient = deepgramClient.listen.live({
         model: "enhanced-phonecall",
         smart_format: true,
         encoding: "mulaw",
         sample_rate: 8000,
         channels: 1,
+        punctuate: true,
+      });
+      const messageAudioBuffer: Array<Buffer> = [];
+      let transcriptCollection: Array<string> = [];
+
+      ws.on("message", async (data: $TSFixMe) => {
+        const twilioMessage = JSON.parse(data);
+        const event = twilioMessage["event"];
+
+        if (event === "connected") {
+          console.info("Received a Twilio Connected Event");
+        }
+
+        if (event === "start") {
+          const callSid = twilioMessage.start.callSid;
+          ws.connectionLabel = callSid;
+          const streamSid = twilioMessage.streamSid;
+          console.info(`Starting Media Stream ${streamSid} for ${callSid}`);
+        }
+
+        if (event === "media") {
+          const isDeepgramConnectionReady =
+            deepgramConnection.getReadyState() === 1;
+          const media = twilioMessage["media"];
+          const audio = Buffer.from(media["payload"], "base64");
+          messageAudioBuffer.push(audio);
+          if (isDeepgramConnectionReady) {
+            while (messageAudioBuffer.length) {
+              const audio = messageAudioBuffer.shift();
+              if (audio) {
+                deepgramConnection.send(audio);
+              }
+            }
+          }
+        }
+      });
+
+      ws.on("close", () => {
+        console.info("client has disconnected");
+        if (deepgramConnection) {
+          deepgramConnection.finish();
+        }
+      });
+
+      ws.on("error", async (err: $TSFixMe) => {
+        const reason = err?.message || "Something Went Wrong";
+        console.error({ error: reason });
+        if (ws.connectionLabel) {
+          const isCallFinished = await callService.hasCallFinished(
+            ws.connectionLabel
+          );
+          if (!isCallFinished) {
+            await hangupCall({
+              callSid: ws.connectionLabel,
+              callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+              callEndReason: `Websocket Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`,
+            });
+          }
+        }
+        if (deepgramConnection) {
+          deepgramConnection.finish();
+        }
       });
 
       deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
+        console.info("Deepgram connection is ready and opened.");
+
         deepgramConnection.on(
           LiveTranscriptionEvents.Transcript,
-          async (transcription) => {
+          async (transcription: LiveTranscriptionEvent) => {
             const transcript = transcription.channel.alternatives[0].transcript;
-
+            // const isInterrupt =
+            //   transcription.channel.alternatives[0].confidence > 0.9;
+            // console.info({
+            //   transcript,
+            // isInterrupt,
+            // confidence: transcription.channel.alternatives[0].confidence,
+            // previousReponseType,
+            // });
+            // if (
+            //   isInterrupt &&
+            //   previousReponseType !== ResponseType.SEND_DIGITS
+            // ) {
+            //   console.info("Interrupting Bot to get Silent.");
+            //   updateInProgessCall(ws.connectionLabel!, {
+            //     content: "",
+            //     responseType: ResponseType.SAY_FOR_VOICE,
+            //   });
+            // } else {
+            //   console.info("NOT, Interrupting Bot to get Silent.");
+            // }
+            console.info({ transcript });
             if (transcript) {
               transcriptCollection.push(transcript);
             }
-            console.info({ transcript });
-            if (transcriptCollection.length < 1 || transcript) {
-              return;
-            }
 
-            const userInput = transcriptCollection.join("");
-            transcriptCollection = [];
-            console.info({ userInput });
-            await agent(openaiClient, userInput, enqueueAssistantMessage);
+            if (
+              transcription.speech_final &&
+              PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
+            ) {
+              const userInput = transcriptCollection.join("");
+              transcriptCollection = [];
+              console.log({
+                user: userInput,
+                when: "When Deepgram Connection opened.",
+              });
+              agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
+            }
           }
         );
 
         deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
           console.info("Deepgram Connection closed.");
-        });
-
-        ws.on("message", (data: $TSFixMe) => {
-          const twilioMessage = JSON.parse(data);
-
-          if (
-            twilioMessage["event"] === "connected" ||
-            twilioMessage["event"] === "start"
-          ) {
-            console.info("Received a Twilio Connected or Start Event");
-          }
-
-          if (twilioMessage["event"] === "media") {
-            const media = twilioMessage["media"];
-            const audio = Buffer.from(media["payload"], "base64");
-            deepgramConnection.send(audio);
+          const userInput = transcriptCollection.join("");
+          transcriptCollection = [];
+          if (userInput.trim().length > 0) {
+            console.log({
+              user: userInput,
+              when: "When Deepgram Connection closed.",
+            });
+            agent(userInput, ws.connectionLabel, enqueueAssistantMessage);
           }
         });
 
-        ws.on("close", () => {
-          console.info("client has disconnected");
-          if (deepgramConnection) {
-            deepgramConnection.finish();
+        deepgramConnection.on(
+          LiveTranscriptionEvents.Error,
+          async (err: $TSFixMe) => {
+            const reason = err?.message || "Something Went Wrong";
+            console.info({ error: reason });
+            if (ws.connectionLabel) {
+              const isCallFinished = await callService.hasCallFinished(
+                ws.connectionLabel
+              );
+              if (!isCallFinished) {
+                await hangupCall({
+                  callSid: ws.connectionLabel,
+                  callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+                  callEndReason: `Deepgram Connection Recieved Error: ${ws.connectionLabel || "Call SID NA"} for ${reason}.`,
+                });
+              }
+            }
           }
-        });
-
-        ws.on("error", (err) => {
-          const message = err?.message || "Something Went Wrong!!";
-          if (deepgramConnection) {
-            deepgramConnection.finish();
-          }
-          throw Error(message);
-        });
+        );
       });
     });
     console.info(`Listening on port ${port}`);
@@ -106,21 +230,30 @@ const startProcessingAssistantMessages = async () => {
   try {
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
-      if (callSid && assistantMessages.length > 0) {
+      if (assistantMessages.length > 0) {
         const message = assistantMessages.shift();
-        if (!message || !message.content) {
-          console.info("Cannot Push Empty Message to Update Call");
+        const callSid = message?.callSid;
+        if (!message || !message.response.content) {
+          console.info("Cannot Push Empty Message to Update Call.");
           return;
         }
-        await updateInProgessCall(callSid, message);
+        if (!callSid) {
+          console.error("Call Sid is Missing.");
+          return;
+        }
+        const shouldNotSendPackets = await callService.hasCallFinished(callSid);
+        if (shouldNotSendPackets) {
+          console.info(
+            `Cannot Update Terminated Call: ${callSid} for ${message.response.content}`
+          );
+          return;
+        }
+        // previousReponseType = message.response.responseType;
+        updateInProgessCall(callSid, message.response);
       } else {
         await new Promise((resolve) =>
-          messageQueue.once("new_message", resolve)
+          messageAudioBuffer.once("new_message", resolve)
         );
-      }
-      if (!callSid) {
-        console.error("Call Sid is Missing.");
       }
     }
   } catch (err) {

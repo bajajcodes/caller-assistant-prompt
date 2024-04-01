@@ -1,6 +1,14 @@
 export enum MODELS {
   GPT4 = "gpt-4",
   GPT4_1106_PREVIEW = "gpt-4-1106-preview",
+  GPT_3_5_TUBRO = "gpt-3.5-turbo",
+}
+
+//info: temporarily stored here
+export enum ENDPOINTING {
+  INITAL = 10,
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  AFTER_TIMEOUT = 10,
 }
 
 export enum ResponseType {
@@ -8,11 +16,6 @@ export enum ResponseType {
   SEND_DIGITS = "sendDigits",
   END_CALL = "endCall",
 }
-
-// export enum InputSource {
-//   HUMAN = "Human",
-//   IVR = "IVR",
-// }
 
 interface BaseResponse {
   responseType: ResponseType;

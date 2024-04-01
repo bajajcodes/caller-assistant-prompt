@@ -1,89 +1,42 @@
+import { getCallService } from "index";
 import OpenAI from "openai";
-import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
+import {
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionSystemMessageParam,
+  ChatCompletionUserMessageParam,
+} from "openai/resources/index.mjs";
+import { CALL_ENDED_BY_WHOM } from "types/call";
 import { AssistantResponse, MODELS } from "types/openai";
-//TODO: fix no-unused-vars for $TSFixMe type
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { systemPromptCollection } from "utils/data";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { $TSFixMe } from "../types/common";
 import { OPEN_AI_KEY } from "../utils/config";
+import { hangupCall } from "./twilio";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const tools = [
-  {
-    type: "function",
-    function: {
-      name: "getDataOrDataPresentation",
-      description: "Get the provider application data or data presentation.",
-      parameters: {
-        type: "object",
-        properties: {},
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "updateApplicationStatus",
-      description: "Update the provider application status update.",
-      parameters: {
-        type: "object",
-        properties: {
-          applicationStatus: {
-            type: "string",
-          },
-        },
-        required: ["applicationStatus"],
-      },
-    },
-  },
-];
+let openaiClient: OpenAI;
 
-let chatMessages: Array<ChatCompletionMessageParam> = [];
-
-const updateApplicationStatus = async (applicationStatus: string) => {
-  await fetch("http://localhost:3000/applicationupdate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ applicationStatus }),
-  });
-};
-
-const getDataOrDataPresentation = async () => {
-  const response = await fetch("http://localhost:3000/data");
-  const data = await response.json();
-  console.info({ data });
-  return data.data;
-};
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const availableTools: { [key: string]: (...args: $TSFixMe[]) => $TSFixMe } = {
-  updateApplicationStatus,
-  getDataOrDataPresentation,
-};
-
-const intializeChatMessages = (providerData: string) => {
+const getSystemRoleMessage = (
+  providerData: Record<string, string>
+): ChatCompletionSystemMessageParam => {
+  const providerDataStringified = JSON.stringify(providerData);
   const data = {
     label: "Data Presentation or Data",
-    instruction: providerData.replaceAll("\t", " "),
+    instruction: providerDataStringified.replaceAll("\t", " "),
   };
   const content = [...systemPromptCollection, data].reduce(
     (prompt, item) => `${prompt} ${item.label}:${item.instruction} `,
     ""
   );
-  chatMessages = [];
-  chatMessages.push({ role: "system", content });
+  return { role: "system", content };
 };
-
-const getChatMessages = () => chatMessages;
 
 const connectOpenAI = async () => {
   try {
     if (!OPEN_AI_KEY) {
       throw Error("Open AI Key is Missing");
     }
-    return new OpenAI({ apiKey: OPEN_AI_KEY });
+    openaiClient = new OpenAI({ apiKey: OPEN_AI_KEY });
+    return openaiClient;
   } catch (err: $TSFixMe) {
     const reason = err?.message;
     console.error({ message: "Failed to Connect with OpenAI", reason });
@@ -92,16 +45,31 @@ const connectOpenAI = async () => {
 };
 
 const agent = async (
-  openai: OpenAI,
   userInput: string,
-  onUpdate: (assistantPrompt: AssistantResponse) => void
+  callSid: string | undefined,
+  onUpdate: (assistantPrompt: AssistantResponse, callSid: string) => void
 ): Promise<void> => {
   try {
-    chatMessages.push({ role: "user", content: userInput });
-    //TODO: test the function calls.
-    const completeion = await openai.chat.completions.create({
+    const callService = getCallService();
+    if (!callSid) throw Error(`CallSid: ${callSid} is Missing.`);
+    const chatMessages = await callService.getConversationHistory(callSid);
+    if (!chatMessages || chatMessages.length < 1)
+      throw Error(`Chat Messages for CallSid: ${callSid} are Missing.`);
+    const userRoleMessage: ChatCompletionUserMessageParam = {
+      role: "user",
+      content: userInput,
+    };
+    chatMessages.push(userRoleMessage);
+    let LLM_MODEL = await callService.getCallModel(callSid);
+    if (!LLM_MODEL) {
+      LLM_MODEL = MODELS.GPT4_1106_PREVIEW;
+      console.info(
+        `Call Not Initialized with LLM Model, Switching To LLM Model: ${MODELS.GPT4_1106_PREVIEW} for ${callSid}`
+      );
+    }
+    const completeion = await openaiClient.chat.completions.create({
       messages: chatMessages,
-      model: MODELS.GPT4_1106_PREVIEW,
+      model: LLM_MODEL,
       response_format: {
         type: "json_object",
       },
@@ -111,46 +79,36 @@ const agent = async (
     const { message } = choice;
     const { content } = message;
     const assistantPrompt = content;
-    console.info({ assistantPrompt });
 
     if (!assistantPrompt) return;
-
-    // if (finish_reason === "tool_calls" && message.tool_calls) {
-    //   const functionName = message.tool_calls[0].function.name;
-    //   const functionToCall = availableTools[functionName];
-    //   const functionArgs = JSON.parse(message.tool_calls[0].function.arguments);
-    //   const functionArgsArr = Object.values(functionArgs);
-    //   console.info({
-    //     functionName,
-    //     functionToCall,
-    //     functionArgs,
-    //     functionArgsArr,
-    //   });
-    //   // eslint-disable-next-line prefer-spread
-    //   const functionResponse = await functionToCall.apply(
-    //     null,
-    //     functionArgsArr
-    //   );
-    //   console.info({ functionResponse });
-    //   chatMessages.push({
-    //     role: "function",
-    //     name: functionName,
-    //     content: ` The result of the last function was this: ${JSON.stringify(functionResponse)}`,
-    //   });
-    //   console.info({ functionResponse });
-    //   return;
-    // }
-    chatMessages.push({ role: "assistant", content: assistantPrompt });
     const assistantResponse = JSON.parse(assistantPrompt) as AssistantResponse;
-    onUpdate(assistantResponse);
+    const assistantRoleMessage: ChatCompletionAssistantMessageParam = {
+      role: "assistant",
+      content: assistantResponse.content,
+    };
+
+    await Promise.all([
+      callService.storeMessage(callSid, userRoleMessage),
+      callService.storeMessage(callSid, assistantRoleMessage),
+    ]);
+    onUpdate(assistantResponse, callSid);
+
+    console.log({
+      bot: assistantResponse.content,
+      reponseType: assistantResponse.responseType,
+    });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
     console.error({
       message: "Failed to get LLM or Assistant Response.",
       reason,
     });
-    throw err;
+    await hangupCall({
+      callSid,
+      callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
+      callEndReason: `Failed to get LLM or Assistant Response: ${callSid} for ${reason}.`,
+    });
   }
 };
 
-export { agent, connectOpenAI, getChatMessages, intializeChatMessages };
+export { agent, connectOpenAI, getSystemRoleMessage };

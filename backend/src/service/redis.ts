@@ -2,9 +2,10 @@ import type { RedisClientType } from "redis";
 import { createClient } from "redis";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
+import { STORE_KEYS } from "types/redis";
 import { REDIS_CLIENT_URL } from "utils/config";
 
-let redisClient: RedisClientType;
+export let redisClient: RedisClientType;
 
 const connectRedis = async () => {
   try {
@@ -23,4 +24,8 @@ const connectRedis = async () => {
   }
 };
 
-export { connectRedis, redisClient };
+async function storeHost(host: string) {
+  await redisClient.set(STORE_KEYS.HOST, host);
+}
+
+export { connectRedis, storeHost };

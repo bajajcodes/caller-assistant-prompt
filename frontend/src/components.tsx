@@ -2,7 +2,27 @@
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = "";
+
+const resetCallContext = async () => {
+  const response = await fetch(`${API_BASE_URL}/reset`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return await response.json();
+};
+
+const hangupCall = async () => {
+  const response = await fetch(`${API_BASE_URL}/hangup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return await response.json();
+};
 
 const makeACallFetcher = async (
   _endpoint: string,
@@ -29,7 +49,14 @@ const transcriptionFetcher = async () => {
 
 const getCallStatus = async () => {
   const response = await fetch(`${API_BASE_URL}/callstatus`);
-  return await response.json();
+  const data = await response.json();
+  return data.callStatus;
+};
+
+const getApplicationStatus = async () => {
+  const response = await fetch(`${API_BASE_URL}/applicationstatus`);
+  const data = await response.json();
+  return { applicationStatus: data.applicationStatus, content: data.content };
 };
 
 function MakeACallForm({
@@ -117,81 +144,159 @@ export const MakeCall = () => {
 };
 
 export const FetchAndRenderTranscription = () => {
-  const { data, isLoading, isValidating } = useSWR(
-    "/transcription",
-    transcriptionFetcher,
-    {
-      refreshInterval: 1000,
-      revalidateIfStale: true,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-    }
-  );
-  const filteredData = data?.slice?.(1) || ([] as Array<unknown>);
+  const { data, isLoading } = useSWR("/transcription", transcriptionFetcher, {
+    refreshInterval: 5000,
+    revalidateIfStale: true,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
+  const transcription = data || [];
   return (
     <section>
       <h2 className="text-4xl font-bold">Transcription</h2>
-      {filteredData.length < 1 ? (
+      {transcription?.length < 1 ? (
         <p className="text-base leading-8 text-gray-500">
-          {isLoading || isValidating
+          {isLoading
             ? "Fetching Transcription."
             : "Will be available in a moment."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-4 max-h-[480px] overflow-y-scroll scroll-smooth border-2 p-4 leading-8">
-          {filteredData.map((item: Record<string, any>) => {
-            console.info({ item });
-            return (
-              <li>
-                <span className="font-semibold text-orange-500">
-                  {item.role}
-                </span>
-                :&nbsp;
-                <span className="leading-8">
-                  {item.content.content || item.content}
-                </span>
-              </li>
-            );
-          })}
+        <ul className="flex flex-col gap-4 max-h-[480px] overflow-y-scroll scroll-smooth border-2 p-4 leading-8 mt-4 ">
+          {transcription.map((item: Record<string, any>) => (
+            <li>
+              <span className="font-semibold text-orange-500">{item.role}</span>
+              :&nbsp;
+              <span className="leading-8">{item.content}</span>
+            </li>
+          ))}
         </ul>
       )}
     </section>
   );
 };
 
-export const FetchAndRenderCallStatus = () => {
-  const { data, isLoading, isValidating } = useSWR(
-    "/callstatus",
-    getCallStatus,
+export const FetchAndRenderApplicationStatus = () => {
+  const { data, isLoading } = useSWR(
+    "/applicationstatus",
+    getApplicationStatus,
     {
-      refreshInterval: 1000,
+      refreshInterval: 10000,
       revalidateIfStale: true,
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
     }
   );
-  const applicationStatus = data?.applicationStatus || "NA";
-  const callStatus = data?.callStatus || "NA";
+  const {
+    data: mutationData,
+    trigger,
+    isMutating,
+  } = useSWRMutation("/applicationstatus", getApplicationStatus);
+  const rawApplicationStatus = (data || mutationData)?.applicationStatus;
+  const rawContent = (data || mutationData)?.content;
+  const applicationStatus =
+    data || mutationData ? (data || mutationData)?.applicationStatus : "";
+  const content = data || mutationData ? (data || mutationData)?.content : "";
+  const isDataAvailable = Boolean(rawApplicationStatus) || Boolean(rawContent);
   return (
-    <div className="text-cyan-500 font-bold">
-      <h2 className="text-4xl font-bold text-white">Application Status</h2>
-      {isLoading || (isValidating && <p>Fetching...</p>)}
-      {data ? (
-        <div className="flex flex-col gap-4">
-          <p>
-            <span>CallStatus:&nbsp;</span>
-            <span>{callStatus}</span>
-          </p>
-          <p>
-            <span>ApplicationStatus:&nbsp;</span>
-            <span>{applicationStatus}</span>
-          </p>
-        </div>
+    <div className="">
+      <div className="flex gap-4 items-center justify-center">
+        <h2 className="text-4xl font-bold text-white">Application Status</h2>
+        <button
+          type="button"
+          onClick={() => trigger()}
+          className="hover:ring-0 focus:ring-0 hover:border-none focus:border-none focus-within:ring-0"
+        >
+          🔃
+        </button>
+      </div>
+      {!isDataAvailable ? (
+        <>
+          <div className="text-base leading-8 text-gray-500">
+            {isLoading || isMutating
+              ? "Fetching Application Status"
+              : " Will be available in a moment."}
+          </div>
+        </>
       ) : (
-        <div className="text-base leading-8 text-gray-500">
-          Will be available in a moment.
-        </div>
+        <>
+          <div className="flex flex-col gap-4">
+            <p>
+              <span className="font-semibold text-orange-500">
+                status:&nbsp;
+              </span>
+              <span className="leading-8">
+                {JSON.stringify(applicationStatus || content || "--")}
+              </span>
+            </p>
+          </div>
+        </>
       )}
+    </div>
+  );
+};
+
+export const FetchAndRenderCallStatus = () => {
+  const { data, isLoading } = useSWR("/callstatus", getCallStatus, {
+    refreshInterval: 5000,
+    revalidateIfStale: true,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
+  const callStatus = data || "--";
+  return (
+    <div className="mt-4">
+      <h2 className="text-4xl font-bold text-white">Call Status</h2>
+      {!data ? (
+        <>
+          <div className="text-base leading-8 text-gray-500">
+            {isLoading
+              ? "Fetching Call Status"
+              : " Will be available in a moment."}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-col gap-4">
+            <p>
+              <span className="font-semibold text-orange-500">
+                status:&nbsp;
+              </span>
+              <span className="leading-8">{callStatus}</span>
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export const HangupAndRestCall = () => {
+  const { trigger: reset } = useSWRMutation("/reset", resetCallContext);
+  const { trigger: hangup } = useSWRMutation("/hangup", hangupCall);
+  return (
+    <div className="flex flex-col gap-4">
+      <button
+        onClick={() => {
+          reset();
+          window.alert(
+            "Call Info Reset Done. Please wait for 5-10 seconds to get UI refreshed."
+          );
+        }}
+        className="bg-orange-500 hover:bg-orange-500/90 text-white py-2 px-4 max-w-32 mx-auto w-full"
+      >
+        Reset Call
+      </button>
+      <button
+        onClick={() => {
+          hangup();
+          window.alert(
+            "Call Hangup Done. Please wait for 5-10 seconds to get UI refreshed."
+          );
+        }}
+        className="bg-red-500 hover:bg-red-500/90 text-white py-2 px-4 max-w-32 mx-auto w-full"
+      >
+        Hangup Call
+      </button>
     </div>
   );
 };

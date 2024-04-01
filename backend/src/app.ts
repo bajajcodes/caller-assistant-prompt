@@ -1,16 +1,12 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { getChatMessages, intializeChatMessages } from "service/openai";
-import { redisClient } from "service/redis";
-import { twilioClient } from "service/twilio";
-import twillio from "twilio";
+import { getCallService } from "index";
+import { storeHost } from "service/redis";
+import { makeCallsInBatch } from "service/twilio";
+import { CALL_APPLICATION_STATUS, CALL_ENDED_BY_WHOM } from "types/call";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { $TSFixMe } from "types/common";
-import { STORE_KEYS } from "types/redis";
-import { TWILIO_FROM_NUMBER } from "utils/config";
 
-const VoiceResponse = twillio.twiml.VoiceResponse;
 const app: Express = express();
 
 app.use(cors());
@@ -23,85 +19,43 @@ app.use(async (req, _, next) => {
   const wsProtocol = protocol === "https" ? "wss" : "ws";
   req.headers.protocol = protocol;
   req.headers.wsProtocol = wsProtocol;
-  await redisClient.set(STORE_KEYS.HOST, req.headers.host!);
+  //TODO: remove not null assertion
+  await storeHost(req.headers.host!);
   next();
 });
 
 app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
-app.get("/callstatus", async (_, res) => {
-  const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
-  return res.json({ callStatus });
-});
-
-app.get("/applicationstatus", async (_, res) => {
-  const applicationStatus =
-    (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "NA";
-  return res.json({ applicationStatus });
-});
-
-app.get("/transcription", (_, res) => {
-  const chatMessages = getChatMessages();
-  const transcription = chatMessages.filter(
-    (message) => message.role === "user" || message.role === "assistant"
+app.get("/calllog/:callsid", async (req, res) => {
+  const callSid = req.params.callsid;
+  const callService = getCallService();
+  const call = await callService.getCall(callSid);
+  const callTranscription = call?.callTranscription.filter(
+    (transcript) =>
+      transcript.role === "user" || transcript.role === "assistant"
   );
-  res.json({ transcription });
+
+  if (!call)
+    return res
+      .status(404)
+      .json({ message: `Call Details not found for Sid: ${callSid}.` });
+  return res.json({
+    callSid: call.callSid,
+    callStatus: call.callStatus,
+    callEndedByWhom: call.callEndedByWhom,
+    callEndReason: call.callEndReason,
+    callApplicationStatus: call.callApplicationStatus,
+    callTranscription,
+  });
 });
 
-app.post("/makeacall", async (req, res) => {
-  try {
-    const twilioCallToNumber = req.body.twilioCallToNumber;
-    const providerData = req.body.providerData;
-    if (!twilioCallToNumber || !providerData) {
-      throw Error("Call To Number or Provider Data is Missing");
-    }
-    if (!TWILIO_FROM_NUMBER) {
-      throw Error("Call From Number is Missing");
-    }
-    const response = new VoiceResponse();
-    const connect = response.connect();
-    response.say("");
-    connect.stream({
-      url: `${req.headers.wsProtocol}://${req.headers.host}`,
-      track: "inbound_track",
-    });
-    response.pause({
-      length: 120,
-    });
-    const twiml = response.toString();
-    const call = await twilioClient.calls.create({
-      twiml,
-      to: twilioCallToNumber,
-      from: TWILIO_FROM_NUMBER,
-      record: true,
-      statusCallback: `${req.headers.protocol}://${req.headers.host}/callupdate`,
-      statusCallbackMethod: "POST",
-      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
-    });
-    // await redisClient.hSet(call.sid, {
-    //   providerData,
-    //   callSid: call.sid,
-    //   callStatus: "",
-    //   applicationStatus: "",
-    // });
-    redisClient.set(STORE_KEYS.CALL_SID, call.sid);
-    redisClient.set(STORE_KEYS.PROVIDER_DATA, providerData);
-    redisClient.set(STORE_KEYS.APPLICATION_STATUS, "NA");
-    redisClient.set(STORE_KEYS.CALL_STATUS, "");
-    intializeChatMessages(providerData);
-    console.info(`Call initiated with SID: ${call.sid}`);
-    res.json({
-      message: `Call initiated with SID: ${call.sid}`,
-      callSid: call.sid,
-      callInitiated: true,
-    });
-  } catch (err: $TSFixMe) {
-    console.error({ err });
-    res.status(400).json({
-      message: "Failed to initiate call",
-      callInitiated: false,
-    });
-  }
+app.post("/batch", async (req, res) => {
+  const payload = req.body;
+  //empty array is valid payload
+  if (!Array.isArray(payload))
+    return res.status(400).json({ message: "Provider's data is not invalid" });
+  makeCallsInBatch(payload);
+  return res.json({ message: "Batch Created" });
 });
 
 app.post("/callupdate", async (req, res) => {
@@ -111,12 +65,33 @@ app.post("/callupdate", async (req, res) => {
     "for Call SID:",
     req.body.CallSid
   );
-  // const call = await redisClient.hGetAll(req.body.callSid);
-  // await redisClient.hSet(call.callSid, {
-  //   ...call,
-  //   callStatus: req.body.CallStatus,
-  // });
-  redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
+  const callTerminationStatuses = [
+    "completed",
+    "busy",
+    "failed",
+    "no-answer",
+    "canceled",
+  ];
+  const callSevice = getCallService();
+
+  if (callTerminationStatuses.includes(req.body.CallStatus)) {
+    await callSevice.updateCall(
+      req.body.CallSid,
+      {
+        callStatus: req.body.CallStatus,
+        callEndedByWhom: CALL_ENDED_BY_WHOM.CALL_TO,
+        callApplicationStatus: CALL_APPLICATION_STATUS.NA,
+        callEndReason:
+          req.body.CallStatus === "completed" ? "NA" : "Call was not Accepted.",
+      },
+      true
+    );
+  } else {
+    callSevice.updateCall(req.body.CallSid, {
+      callStatus: req.body.CallStatus,
+    });
+  }
+
   return res.status(200).send();
 });
 
