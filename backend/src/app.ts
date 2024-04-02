@@ -3,7 +3,7 @@ import type { Express } from "express";
 import express from "express";
 import { getCallService } from "index";
 import { redisClient } from "service/redis";
-import { makeacall } from "service/twilio";
+import { hangupCall, makeacall } from "service/twilio";
 import { CALL_APPLICATION_STATUS, CALL_ENDED_BY_WHOM } from "types/call";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
@@ -104,6 +104,15 @@ app.post("/callstatusupdate", async (req, res) => {
     });
   }
 
+  return res.status(200).send();
+});
+
+app.post("/hangupcall", (req, res) => {
+  const callSid = req.body.callSid;
+  const callEndedBy = req.body.callEndedBy;
+  const callEndReason = req.body.callEndReason;
+
+  hangupCall({ callSid, callEndedBy, callEndReason });
   return res.status(200).send();
 });
 

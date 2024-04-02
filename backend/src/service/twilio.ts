@@ -88,12 +88,15 @@ const updateInProgessCall = async (
     if (responseType === ResponseType.END_CALL) {
       //INFO: content is not spoken out if response type is end call
       //TODO: end the call when content is spoken out
-      await hangupCall({
-        callSid,
-        callEndedBy: CALL_ENDED_BY_WHOM.BOT,
-        callEndReason: message.content,
-      });
-      return;
+      //TODO: temporarily disabled bot ending the call
+      //INFO: because of higher numbers of premature call hangup by bot.
+      // await hangupCall({
+      //   callSid,
+      //   callEndedBy: CALL_ENDED_BY_WHOM.BOT,
+      //   callEndReason: message.content,
+      // });
+      // return;
+      console.info(`twilio: call hangup by bot is temporarily disabled.`);
     }
     const response = new VoiceResponse();
     if (responseType === ResponseType.SAY_FOR_VOICE) {
