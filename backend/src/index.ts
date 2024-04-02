@@ -14,15 +14,15 @@ import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
 
-export const messageQueue = new EventEmitter();
+const messageQueue = new EventEmitter();
+const port = PORT || 3000;
+const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 let lastSentTime = 0;
 let transcriptCollection: Array<string> = [];
-const assistantMessages: Array<{
+let assistantMessages: Array<{
   response: AssistantResponse;
   callSid: string;
 }> = [];
-const port = PORT || 3000;
-const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 let callService: CallService;
 
 export function getCallService(): CallService {
@@ -35,6 +35,10 @@ export function getCallService(): CallService {
 export async function initializeCallService(redisClient: RedisClientType) {
   callService = new CallService();
   callService.setRedisClient(redisClient);
+}
+
+export function initializeAssistantMessages() {
+  assistantMessages = [];
 }
 
 const enqueueAssistantMessage = (

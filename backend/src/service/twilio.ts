@@ -1,4 +1,4 @@
-import { getCallService } from "index";
+import { getCallService, initializeAssistantMessages } from "index";
 import twillio, { Twilio } from "twilio";
 import { CALL_APPLICATION_STATUS, CALL_ENDED_BY_WHOM } from "types/call";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -169,6 +169,7 @@ const makeacall = async (providerData: Record<string, string>) => {
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     });
+    initializeAssistantMessages();
     const callService = getCallService();
     callService.setCallSid(call.sid);
     await callService.createCall(call.sid, systemRoleMessage);
