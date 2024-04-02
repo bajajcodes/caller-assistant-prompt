@@ -14,6 +14,7 @@ import { WebSocketServer } from "ws";
 import app from "./app";
 
 export const messageQueue = new EventEmitter();
+let lastSentTime = 0;
 let transcriptCollection: Array<string> = [];
 const assistantMessages: Array<{
   response: AssistantResponse;
@@ -39,9 +40,48 @@ const enqueueAssistantMessage = (
   assitantResponse: AssistantResponse,
   callSid: string
 ) => {
+  console.info(`assistant_messages: pushed new assistant response.`);
   assistantMessages.push({ response: assitantResponse, callSid });
   messageQueue.emit("new_message");
 };
+
+function sendTranscription() {
+  const userInput = transcriptCollection.join("");
+  transcriptCollection = [];
+  if (userInput.trim().length) {
+    console.info({ userInput });
+    agent(userInput, callService.callSid, enqueueAssistantMessage);
+    lastSentTime = Date.now();
+  }
+}
+
+async function processTranscription(transcription: LiveTranscriptionEvent) {
+  const currentTime = Date.now();
+  const transcript = transcription.channel.alternatives[0].transcript;
+  console.info({
+    transcript,
+    speechFinal: transcription.speech_final,
+    terminated: PUNCTUATION_TERMINATORS.includes(transcript.slice(-1)),
+  });
+
+  if (!transcript) return;
+
+  if (transcript) {
+    transcriptCollection.push(transcript);
+  }
+
+  if (
+    transcription.speech_final ||
+    PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
+  ) {
+    sendTranscription();
+  } else if (currentTime - lastSentTime >= 3000) {
+    console.info(
+      `transcription: sending transcription after no transcripts have been sent to the agent within the last 3 seconds.`
+    );
+    sendTranscription();
+  }
+}
 
 const startServer = async () => {
   try {
@@ -61,34 +101,7 @@ const startServer = async () => {
       deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
         deepgramConnection.on(
           LiveTranscriptionEvents.Transcript,
-          async (transcription: LiveTranscriptionEvent) => {
-            const transcript = transcription.channel.alternatives[0].transcript;
-            console.info({
-              transcript,
-              speechFinal: transcription.speech_final,
-              terminated: PUNCTUATION_TERMINATORS.includes(
-                transcript.slice(-1)
-              ),
-            });
-
-            if (!transcript) return;
-
-            if (transcript) {
-              transcriptCollection.push(transcript);
-            }
-
-            if (
-              !transcription.speech_final &&
-              !PUNCTUATION_TERMINATORS.includes(transcript.slice(-1))
-            ) {
-              return;
-            }
-
-            const userInput = transcriptCollection.join("");
-            transcriptCollection = [];
-            console.info({ userInput });
-            agent(userInput, callService.callSid, enqueueAssistantMessage);
-          }
+          processTranscription
         );
 
         deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
@@ -139,6 +152,7 @@ const startProcessingAssistantMessages = async () => {
   try {
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      console.info(`processing_assistant_messages: checking for new message.`);
       if (assistantMessages.length > 0) {
         const message = assistantMessages.shift();
         const callSid = message?.callSid;
@@ -159,8 +173,10 @@ const startProcessingAssistantMessages = async () => {
           );
           return;
         }
+        console.info(`processing_assistant_messages: found new message.`);
         await updateInProgessCall(callSid, message.response);
       } else {
+        console.info(`processing_assistant_messages: no new message.`);
         await new Promise((resolve) =>
           messageQueue.once("new_message", resolve)
         );
