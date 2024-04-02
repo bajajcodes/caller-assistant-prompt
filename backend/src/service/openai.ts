@@ -84,13 +84,12 @@ const agent = async (
     });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
-    console.error(
-      `openai: ${reason || "failed to get llm or assistant Response"}.`
-    );
+    const callEndReason = `openai: ${reason || "failed to get llm or assistant Response"}.`;
+    console.error(callEndReason);
     await hangupCall({
       callSid,
       callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
-      callEndReason: `openai: ${reason || "failed to get llm or assistant Response"}.`,
+      callEndReason: callEndReason,
     });
   }
 };

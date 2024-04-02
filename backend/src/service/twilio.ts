@@ -119,13 +119,12 @@ const updateInProgessCall = async (
     });
   } catch (err: $TSFixMe) {
     const reason = err?.message;
-    console.error(
-      `twilio: ${reason || "Failed to Update Call"} for callsid: ${callSid} with errorCode: ${err.code}.`
-    );
+    const callEndReason = `twilio: ${reason || "Failed to Update Call"} for callsid: ${callSid} with errorCode: ${err.code}.`;
+    console.error(callEndReason);
     await hangupCall({
       callSid,
       callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
-      callEndReason: `Failed to Update Call: ${reason}`,
+      callEndReason: callEndReason,
     });
   }
 };
