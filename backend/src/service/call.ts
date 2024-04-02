@@ -170,7 +170,7 @@ export class CallService {
       "failed",
       "no-answer",
     ];
-
+    console.info(`callservice: ${callSid} status: ${call.callStatus}`);
     return finishedStatuses.includes(call.callStatus);
   }
 
