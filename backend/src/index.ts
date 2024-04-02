@@ -106,6 +106,10 @@ const startServer = async () => {
 
         deepgramConnection.on(LiveTranscriptionEvents.Close, async () => {
           console.info("deepgram: connection closed.");
+          console.info(
+            `deepgram: sending remaining transcription when connection is closed.`
+          );
+          sendTranscription();
         });
 
         deepgramConnection.addListener(
@@ -114,7 +118,6 @@ const startServer = async () => {
             console.error(
               `deepgram: error recieved, ${error?.message || "something went wrong!!"}`
             );
-            sendTranscription();
           }
         );
 
