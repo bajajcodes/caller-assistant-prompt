@@ -81,22 +81,26 @@ const updateInProgessCall = async (
   try {
     const { responseType, content } = message;
     if (!callSid) {
-      throw Error(
+      console.error(
         `twilio: cannot update call, callsid: ${callSid} doesn't exists.`
       );
+      return;
+    }
+    const isCallTerminated = await getCallService().hasCallFinished(callSid);
+    if (isCallTerminated) {
+      console.error(
+        `twilio: call is already terminated, aborting call update.`
+      );
+      return;
     }
     if (responseType === ResponseType.END_CALL) {
-      //INFO: content is not spoken out if response type is end call
-      //TODO: end the call when content is spoken out
-      //TODO: temporarily disabled bot ending the call
-      //INFO: because of higher numbers of premature call hangup by bot.
-      // await hangupCall({
-      //   callSid,
-      //   callEndedBy: CALL_ENDED_BY_WHOM.BOT,
-      //   callEndReason: message.content,
-      // });
-      // return;
-      console.info(`twilio: call hangup by bot is temporarily disabled.`);
+      //INFO: content is not spoken out if response type is end call, because as of now we don't know when bot is speaking
+      await hangupCall({
+        callSid,
+        callEndedBy: CALL_ENDED_BY_WHOM.BOT,
+        callEndReason: message.content,
+      });
+      return;
     }
     const response = new VoiceResponse();
     if (responseType === ResponseType.SAY_FOR_VOICE) {

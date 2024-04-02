@@ -190,15 +190,8 @@ const startProcessingAssistantMessages = async () => {
           );
           return;
         }
-        const shouldNotSendPackets = await callService.hasCallFinished(callSid);
-        if (shouldNotSendPackets) {
-          console.info(
-            `processing_assistant_messages: cannot update terminated call: ${callSid} for ${message.response.content}.`
-          );
-          return;
-        }
         console.info(`processing_assistant_messages: found new message.`);
-        await updateInProgessCall(callSid, message.response);
+        updateInProgessCall(callSid, message.response);
       } else {
         console.info(`processing_assistant_messages: no new message.`);
         await new Promise((resolve) =>
