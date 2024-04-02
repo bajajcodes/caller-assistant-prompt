@@ -114,6 +114,7 @@ const startServer = async () => {
             console.error(
               `deepgram: error recieved, ${error?.message || "something went wrong!!"}`
             );
+            sendTranscription();
           }
         );
 
@@ -123,15 +124,6 @@ const startServer = async () => {
             console.warn(
               `deepgram: warning received, ${JSON.stringify(warning)}`
             );
-          }
-        );
-
-        deepgramConnection.addListener(
-          LiveTranscriptionEvents.Metadata,
-          (data) => {
-            console.log("deepgram: packet received");
-            console.log("deepgram: metadata received");
-            console.log(`deepgram: ${JSON.stringify({ metadata: data })}`);
           }
         );
 
