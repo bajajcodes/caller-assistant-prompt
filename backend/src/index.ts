@@ -58,11 +58,8 @@ function sendTranscription() {
 
 async function processTranscription(transcription: LiveTranscriptionEvent) {
   const currentTime = Date.now();
-  const transcript = transcription.channel.alternatives[0].transcript;
+  const transcript = transcription.channel.alternatives[0].transcript.trim();
   console.info(`transcription: ${transcript}`);
-  console.info(
-    `transcription: ${transcription.speech_final ? "is final speech" : "is not final speech"} and ends ${PUNCTUATION_TERMINATORS.includes(transcript.slice(-1)) ? "with" : "without"} punctuation terminators.`
-  );
 
   if (!transcript) return;
 
@@ -160,7 +157,7 @@ const startServer = async () => {
           if (deepgramConnection) {
             deepgramConnection.finish();
           }
-          await hangupCall({
+          hangupCall({
             callSid: callService.callSid,
             callEndedBy: CALL_ENDED_BY_WHOM.ERROR,
             callEndReason: `socket: connection recieved error, ${callService.callSid || "call sid na"} for ${message}.`,
