@@ -70,7 +70,7 @@ export class TranscriptionService extends EventEmitter {
       this.deepgramLive.on(LiveTranscriptionEvents.Error, (err) => {
         console.log("deepgram: error recieved");
         console.error(err);
-        // TODO: Implement any necessary cleanup or termination logic
+        this.emit("transcriptionerror", err);
       });
     });
   }

@@ -73,10 +73,17 @@ const startServer = async () => {
         gptService.completion(text);
       });
 
+      transcriptionService.on("transcriptionerror", () => {
+        streamService.endCall();
+      });
+
       gptService.on("gptreply", async (gptReply: AssistantResponse) => {
         console.log(`gpt: GPT -> TTS: ${gptReply.content}`);
-        //TODO: implement any neccessary logic for GPT -> TTS
         streamService.sendTwiml(gptReply);
+      });
+
+      gptService.on("gpterror", () => {
+        streamService.endCall();
       });
 
       streamService.on("twimlsent", () => {
@@ -85,6 +92,8 @@ const startServer = async () => {
 
       streamService.on("callended", () => {
         console.log(`twilio: call has ended`);
+        //TODO: check if it requires to close the connection
+        // ws?.close?.();
       });
     });
 

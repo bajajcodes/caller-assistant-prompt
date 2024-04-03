@@ -64,6 +64,8 @@ export class StreamService extends EventEmitter {
     const isCallTerminated = await this.isCallTerminated();
     if (isCallTerminated) {
       console.info(`twilio: cannot update terminated call`);
+      //TODO: check if it requires to close the connection
+      // ws?.close?.();
     } else {
       const response = new VoiceResponse();
       const { responseType, content } = message;

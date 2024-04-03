@@ -44,30 +44,36 @@ export class GPTService extends EventEmitter {
   }
 
   async completion(text: string) {
-    this.updateUserContext({ role: "user", content: text });
+    try {
+      this.updateUserContext({ role: "user", content: text });
 
-    const completeion = await this.openaiClient.chat.completions.create({
-      messages: this.context,
-      model: MODELS.GPT4_1106_PREVIEW,
-      response_format: {
-        type: "json_object",
-      },
-    });
-
-    const assistantPrompt = completeion.choices[0].message.content;
-    if (!assistantPrompt) {
-      console.info(`gpt: GPT -> invalid assistant prompt`);
-    } else {
-      const assistantResponse = JSON.parse(
-        assistantPrompt
-      ) as AssistantResponse;
-
-      this.emit("gptreply", assistantResponse);
-      this.updateUserContext({
-        role: "assistant",
-        content: assistantResponse.content,
+      const completeion = await this.openaiClient.chat.completions.create({
+        messages: this.context,
+        model: MODELS.GPT4_1106_PREVIEW,
+        response_format: {
+          type: "json_object",
+        },
       });
-      console.log(`gpt: GPT -> user context length: ${this.context.length}`);
+
+      const assistantPrompt = completeion.choices[0].message.content;
+      if (!assistantPrompt) {
+        console.info(`gpt: GPT -> invalid assistant prompt`);
+      } else {
+        const assistantResponse = JSON.parse(
+          assistantPrompt
+        ) as AssistantResponse;
+
+        this.emit("gptreply", assistantResponse);
+        this.updateUserContext({
+          role: "assistant",
+          content: assistantResponse.content,
+        });
+        console.log(`gpt: GPT -> user context length: ${this.context.length}`);
+      }
+    } catch (err) {
+      console.log("gpt: error recieved");
+      console.error(err);
+      this.emit("gpterror", err);
     }
   }
 
