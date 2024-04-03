@@ -1,22 +1,12 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { getCallService } from "index";
 import { makeOutboundCall } from "scripts/outbound-call";
 import { redisClient } from "service/redis";
-import { hangupCall, makeacall } from "service/twilio";
-import { CALL_APPLICATION_STATUS, CALL_ENDED_BY_WHOM } from "types/call";
+import { hangupCall } from "service/twilio";
+import { Message } from "types/call";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { $TSFixMe } from "types/common";
 import { STORE_KEYS } from "types/redis";
-
-const callTerminationStatuses = [
-  "completed",
-  "busy",
-  "failed",
-  "no-answer",
-  "canceled",
-];
 
 const app: Express = express();
 
@@ -36,72 +26,61 @@ app.use(async (req, _, next) => {
 app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
 app.get("/calllog/:callsid", async (req, res) => {
-  const callSid = req.params.callsid;
-  const callService = getCallService();
-  const call = await callService.getCall(callSid);
-  const callTranscription = call?.callTranscription.filter(
+  const sid = req.params.callsid;
+  const status = await redisClient.get(`${sid}__callstatus`);
+  const callTranscription = await redisClient.lRange(
+    `${sid}__transcription`,
+    0,
+    -1
+  );
+  if (!status && !callTranscription) {
+    return res
+      .status(404)
+      .json({ message: `Call Details not found for CallSid: ${sid}.` });
+  }
+  const transcriptionParsed = callTranscription.map(
+    (message) => JSON.parse(message) as Message
+  );
+  const transcription = transcriptionParsed.filter(
     (transcript) =>
       transcript.role === "user" || transcript.role === "assistant"
   );
 
-  if (!call)
-    return res
-      .status(404)
-      .json({ message: `Call Details not found for CallSid: ${callSid}.` });
-
   return res.json({
-    callSid: call.callSid,
-    callStatus: call.callStatus,
-    callEndedByWhom: call.callEndedByWhom,
-    callEndReason: call.callEndReason,
-    callApplicationStatus: call.callApplicationStatus,
-    callTranscription,
+    sid,
+    status,
+    transcription,
   });
 });
 
-app.post("/makeacall", async (req, res) => {
-  try {
-    const providerData = req.body;
-    const callSid = await makeacall(providerData);
-    res.json({
-      message: `Call initiated with CallSid: ${callSid}`,
-      callSid,
-      callInitiated: true,
-    });
-  } catch (err: $TSFixMe) {
-    res.status(400).json({
-      message: `twilio: ${err?.message || "failed to initiate call"}.`,
-      callInitiated: false,
-    });
-  }
-});
 app.post("/makeoutboundcall", async (req, res) => {
   try {
-    const providerData: Record<string, unknown> = JSON.parse(req.body);
-    const call = await makeOutboundCall(providerData.phoneNumber as string);
+    console.log(req.body);
+    const call = await makeOutboundCall(req.body.phoneNumber as string);
 
     if (call?.sid) {
       // Store the provider data in Redis using the call SID as the key
       await redisClient.set(
-        `${call.sid}:providerdata`,
-        JSON.stringify(providerData)
+        `${call.sid}__providerdata`,
+        JSON.stringify(req.body)
       );
 
       res.json({
         message: `Call initiated with CallSid: ${call.sid}`,
         callSid: call.sid,
-        callInitiated: true,
+        initiated: true,
       });
     } else {
       res.status(400).json({
         message: "Failed to initiate the call.",
-        callInitiated: false,
+        initiated: false,
       });
     }
   } catch (err: unknown) {
+    console.error(err);
     res.status(400).json({
       message: `twilio: ${(err as Error)?.message || "failed to initiate call"}.`,
-      callInitiated: false,
+      initiated: false,
     });
   }
 });
@@ -113,37 +92,13 @@ app.post("/callstatusupdate", async (req, res) => {
     "for Call SID:",
     req.body.CallSid
   );
-  const callSevice = getCallService();
-  //TODO: end call when call status is terminated
-
-  if (callTerminationStatuses.includes(req.body.CallStatus)) {
-    await callSevice.updateCall(
-      req.body.CallSid,
-      {
-        callStatus: req.body.CallStatus,
-        callEndedByWhom: CALL_ENDED_BY_WHOM.CALL_TO,
-        callApplicationStatus: CALL_APPLICATION_STATUS.NA,
-        callEndReason:
-          req.body.CallStatus === "completed" ? "NA" : "Call was not Accepted.",
-      },
-      true
-    );
-    callSevice.setCallSid("");
-  } else {
-    callSevice.updateCall(req.body.CallSid, {
-      callStatus: req.body.CallStatus,
-    });
-  }
-
+  redisClient.set(`${req.body.CallSid}__callstatus`, req.body.CallStatus);
   return res.status(200).send();
 });
 
-app.post("/hangupcall", (req, res) => {
+app.post("/hangupcall", async (req, res) => {
   const callSid = req.body.callSid;
-  const callEndedBy = req.body.callEndedBy;
-  const callEndReason = req.body.callEndReason;
-
-  hangupCall({ callSid, callEndedBy, callEndReason });
+  await hangupCall({ callSid });
   return res.status(200).send();
 });
 
