@@ -1,8 +1,11 @@
 import { createServer } from "http";
+import { GPTService } from "service/gpt-service";
 import { connectRedis } from "service/redis";
 import { StreamService } from "service/stream-service";
 import { TranscriptionService } from "service/transcription-service";
+import { connectTwilio } from "service/twilio";
 import { $TSFixMe } from "types/common";
+import { AssistantResponse } from "types/openai";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
@@ -19,6 +22,7 @@ const startServer = async () => {
 
       const streamService = new StreamService(ws);
       const transcriptionService = new TranscriptionService();
+      const gptService = new GPTService();
 
       ws.on("message", (data: $TSFixMe) => {
         const twilioMessage = JSON.parse(data);
@@ -29,6 +33,7 @@ const startServer = async () => {
           callSid = twilioMessage.start.callSid;
           streamService.setStreamSid(streamSid);
           streamService.setCallSid(callSid);
+          gptService.setCallSid(callSid);
           console.log(`socket -> Starting Media Stream for ${streamSid}`);
         }
 
@@ -62,8 +67,15 @@ const startServer = async () => {
           return;
         }
         console.log(`transcription: ${text}`);
+        gptService.completion(text);
+      });
+
+      gptService.on("gptreply", async (gptReply: AssistantResponse) => {
+        console.log(`gpt: GPT -> TTS: ${gptReply.content}`);
+        //TODO: implement any neccessary logic for GPT -> TTS
       });
     });
+
     console.info(`server: listening on port ${PORT}.`);
     server.listen(PORT);
   } catch (err: $TSFixMe) {
@@ -73,3 +85,4 @@ const startServer = async () => {
 
 connectRedis();
 startServer();
+connectTwilio();
