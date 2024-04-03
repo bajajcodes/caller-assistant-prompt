@@ -2,6 +2,7 @@ import cors from "cors";
 import type { Express } from "express";
 import express from "express";
 import { getCallService } from "index";
+import { makeOutboundCall } from "scripts/outbound-call";
 import { redisClient } from "service/redis";
 import { hangupCall, makeacall } from "service/twilio";
 import { CALL_APPLICATION_STATUS, CALL_ENDED_BY_WHOM } from "types/call";
@@ -74,6 +75,36 @@ app.post("/makeacall", async (req, res) => {
     });
   }
 });
+app.post("/makeoutboundcall", async (req, res) => {
+  try {
+    const providerData: Record<string, unknown> = JSON.parse(req.body);
+    const call = await makeOutboundCall(providerData.phoneNumber as string);
+
+    if (call?.sid) {
+      // Store the provider data in Redis using the call SID as the key
+      await redisClient.set(
+        `${call.sid}:providerdata`,
+        JSON.stringify(providerData)
+      );
+
+      res.json({
+        message: `Call initiated with CallSid: ${call.sid}`,
+        callSid: call.sid,
+        callInitiated: true,
+      });
+    } else {
+      res.status(400).json({
+        message: "Failed to initiate the call.",
+        callInitiated: false,
+      });
+    }
+  } catch (err: unknown) {
+    res.status(400).json({
+      message: `twilio: ${(err as Error)?.message || "failed to initiate call"}.`,
+      callInitiated: false,
+    });
+  }
+});
 
 app.post("/callstatusupdate", async (req, res) => {
   console.info(
@@ -97,7 +128,7 @@ app.post("/callstatusupdate", async (req, res) => {
       },
       true
     );
-    callSevice.setCallSid(undefined);
+    callSevice.setCallSid("");
   } else {
     callSevice.updateCall(req.body.CallSid, {
       callStatus: req.body.CallStatus,
