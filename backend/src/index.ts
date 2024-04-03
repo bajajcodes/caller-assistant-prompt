@@ -20,6 +20,9 @@ const startServer = async () => {
 
       console.info("socket: new client connected.");
 
+      //TODO: pass ws to all services to close the ws connection on close/error
+      //TOOD: end the call on error
+      //TODO: end the call if status is terminated
       const streamService = new StreamService(ws);
       const transcriptionService = new TranscriptionService();
       const gptService = new GPTService();
@@ -73,6 +76,15 @@ const startServer = async () => {
       gptService.on("gptreply", async (gptReply: AssistantResponse) => {
         console.log(`gpt: GPT -> TTS: ${gptReply.content}`);
         //TODO: implement any neccessary logic for GPT -> TTS
+        streamService.sendTwiml(gptReply);
+      });
+
+      streamService.on("twimlsent", () => {
+        console.log(`twilio: update has been sent`);
+      });
+
+      streamService.on("callended", () => {
+        console.log(`twilio: call has ended`);
       });
     });
 
