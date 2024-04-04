@@ -2,9 +2,11 @@ import cors from "cors";
 import type { Express } from "express";
 import express from "express";
 import { makeOutboundCall } from "scripts/outbound-call";
+import { ActiveCallConfig } from "service/activecall-service";
 import { redisClient } from "service/redis";
 import { hangupCall } from "service/twilio";
 import { Message } from "types/call";
+import { MODELS } from "types/openai";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { STORE_KEYS } from "types/redis";
 
@@ -64,7 +66,11 @@ app.post("/makeoutboundcall", async (req, res) => {
         `${call.sid}__providerdata`,
         JSON.stringify(req.body)
       );
-
+      ActiveCallConfig.getInstance().setCallConfig(
+        call.sid,
+        MODELS.GPT4_1106_PREVIEW,
+        500
+      );
       res.json({
         message: `Call initiated with CallSid: ${call.sid}`,
         callSid: call.sid,
