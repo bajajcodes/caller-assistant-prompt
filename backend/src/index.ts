@@ -79,6 +79,7 @@ const startServer = async () => {
 
       gptService.on("gptreply", async (gptReply: AssistantResponse) => {
         console.log(`gpt: GPT -> TTS: ${gptReply.content}`);
+        console.log(`gpt: response-type:${gptReply.responseType}`);
         streamService.sendTwiml(gptReply);
       });
 

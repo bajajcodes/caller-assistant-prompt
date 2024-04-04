@@ -86,7 +86,7 @@ export const systemPromptCollection: Array<{
   {
     label: "Response Guidelines",
     instruction:
-      "Answer only the question posed by the user without providing unsolicited information, particularly provider-specific details. Begin responses with direct answers to user queries, and do not introduce additional data unless these are specifically requested. Maintain a polite and concise tone throughout. If uncertain whether detail is required, ask the user to specify the information they need.",
+      "Keep your responses as brief as possible. Don't ask more than 1 question at a time. Answer only the question posed by the user without providing unsolicited information, particularly provider-specific details. Begin responses with direct answers to user queries, and do not introduce additional data unless these are specifically requested. Maintain a polite and concise tone throughout. If uncertain whether detail is required, ask the user to specify the information they need.",
   },
   {
     label: "Output Structure",

@@ -10,11 +10,6 @@ export enum ResponseType {
   END_CALL = "endCall",
 }
 
-// export enum InputSource {
-//   HUMAN = "Human",
-//   IVR = "IVR",
-// }
-
 interface BaseResponse {
   responseType: ResponseType;
   content: string;
