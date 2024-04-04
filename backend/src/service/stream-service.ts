@@ -3,6 +3,7 @@ import twillio, { Twilio } from "twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse, ResponseType } from "types/openai";
 import { HOST, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
+import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
 
 const VoiceResponse = twillio.twiml.VoiceResponse;
@@ -49,48 +50,60 @@ export class StreamService extends EventEmitter {
   }
 
   async endCall() {
-    const isCallTerminated = await this.isCallTerminated();
-    if (isCallTerminated) {
-      console.info(`twilio: cannot end already terminated call.`);
-    } else {
-      await this.twilioClient
-        .calls(this.callSid)
-        .update({ status: "completed" });
-      this.emit("callended");
+    try {
+      const isCallTerminated = await this.isCallTerminated();
+      if (isCallTerminated) {
+        console.info(`twilio: cannot end already terminated call.`);
+      } else {
+        await this.twilioClient
+          .calls(this.callSid)
+          .update({ status: "completed" });
+        ActiveCallConfig.getInstance().deleteCallConfig();
+        this.emit("callended");
+      }
+    } catch (err: $TSFixMe) {
+      console.error(`twilio: ${err?.message || "failed to end call"}`);
     }
   }
 
   async sendTwiml(message: AssistantResponse) {
-    const isCallTerminated = await this.isCallTerminated();
-    if (isCallTerminated) {
-      console.info(`twilio: cannot update terminated call`);
-      //TODO: check if it requires to close the connection
-      // ws?.close?.();
-    } else {
-      const response = new VoiceResponse();
-      const { responseType, content } = message;
-
-      if (responseType === ResponseType.END_CALL) {
-        await this.endCall();
+    try {
+      const isCallTerminated = await this.isCallTerminated();
+      if (isCallTerminated) {
+        console.info(`twilio: cannot update terminated call`);
+        //TODO: check if it requires to close the connection
+        // ws?.close?.();
       } else {
-        if (responseType === ResponseType.SAY_FOR_VOICE) {
-          response.say(content);
-        } else if (responseType === ResponseType.SEND_DIGITS) {
-          const digits = content;
-          response.play({ digits });
+        const response = new VoiceResponse();
+        const { responseType, content } = message;
+
+        if (responseType === ResponseType.END_CALL) {
+          await this.endCall();
+        } else {
+          if (responseType === ResponseType.SAY_FOR_VOICE) {
+            response.say(content);
+          } else if (responseType === ResponseType.SEND_DIGITS) {
+            const digits = content;
+            response.play({ digits });
+          }
+          const connect = response.connect();
+          connect.stream({
+            url: `wss://${HOST}`,
+            track: "inbound_track",
+          });
+
+          response.pause({ length: 90 });
+
+          const twiml = response.toString();
+
+          await this.twilioClient.calls(this.callSid).update({ twiml });
+          this.emit("twimlsent");
         }
-        const connect = response.connect();
-        connect.stream({
-          url: `wss://${HOST}`,
-          track: "inbound_track",
-        });
-
-        response.pause({ length: 90 });
-
-        const twiml = response.toString();
-
-        await this.twilioClient.calls(this.callSid).update({ twiml });
-        this.emit("twimlsent");
+      }
+    } catch (err: $TSFixMe) {
+      console.error(`twilio: ${err?.message || "Failed to send twiml"}`);
+      if (err?.code !== 21220) {
+        this.endCall();
       }
     }
   }
