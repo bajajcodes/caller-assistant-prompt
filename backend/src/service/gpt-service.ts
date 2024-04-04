@@ -4,6 +4,7 @@ import { ChatCompletionSystemMessageParam } from "openai/resources/index.mjs";
 import { AssistantResponse, MODELS } from "types/openai";
 import { OPEN_AI_KEY } from "utils/config";
 import { systemPromptCollection } from "utils/data";
+import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
 
 type Message = {
@@ -46,10 +47,13 @@ export class GPTService extends EventEmitter {
   async completion(text: string) {
     try {
       this.updateUserContext({ role: "user", content: text });
-
+      const model =
+        ActiveCallConfig.getInstance().getCallConfig()?.callModel ||
+        MODELS.GPT4_1106_PREVIEW;
+      console.info(`gpt: model: ${model}`);
       const completeion = await this.openaiClient.chat.completions.create({
-        messages: this.context,
-        model: MODELS.GPT4_1106_PREVIEW,
+        messages: this.context.filter((msg) => msg.role !== "assistant"),
+        model,
         response_format: {
           type: "json_object",
         },
