@@ -3,7 +3,6 @@ import { GPTService } from "service/gpt-service";
 import { connectRedis } from "service/redis";
 import { StreamService } from "service/stream-service";
 import { TranscriptionService } from "service/transcription-service";
-import { connectTwilio } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
 import { PORT } from "utils/config";
@@ -107,4 +106,3 @@ const startServer = async () => {
 
 connectRedis();
 startServer();
-connectTwilio();
