@@ -1,10 +1,10 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
+import { hangupCall } from "scripts/hangup-call";
 import { makeOutboundCall } from "scripts/outbound-call";
 import { ActiveCallConfig } from "service/activecall-service";
 import { redisClient } from "service/redis";
-import { hangupCall } from "service/twilio";
 import { Message } from "types/call";
 import { MODELS } from "types/openai";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -104,7 +104,8 @@ app.post("/callstatusupdate", async (req, res) => {
 
 app.post("/hangupcall", async (req, res) => {
   const callSid = req.body.callSid;
-  await hangupCall({ callSid });
+  const isCallEnded = await hangupCall(callSid);
+  if (!isCallEnded) return res.status(400).send();
   return res.status(200).send();
 });
 
