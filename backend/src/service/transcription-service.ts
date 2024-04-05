@@ -14,6 +14,7 @@ const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 export class TranscriptionService extends EventEmitter {
   private deepgramLive: LiveClient;
   private finalResult: string;
+  private audioBuffer: Buffer[];
 
   constructor() {
     super();
@@ -33,14 +34,19 @@ export class TranscriptionService extends EventEmitter {
     });
 
     this.finalResult = "";
+    this.audioBuffer = [];
 
     this.deepgramLive.addListener(LiveTranscriptionEvents.Open, () => {
       this.deepgramLive.on(LiveTranscriptionEvents.Close, () => {
         console.log("deepgram: connection closed");
+        console.log(
+          `deepgram: number of lost audio packets: ${this.audioBuffer.length + 1}`
+        );
         if (this.finalResult && this.finalResult.trim().length) {
           this.emit("transcription", this.finalResult);
           this.finalResult = "";
         }
+        this.audioBuffer = [];
       });
 
       this.deepgramLive.on(LiveTranscriptionEvents.Metadata, (data) => {
@@ -86,10 +92,14 @@ export class TranscriptionService extends EventEmitter {
 
   send(payload: $TSFixMe) {
     // TODO: Buffer up the media and then send
+    const audioBuffer = Buffer.from(payload, "base64");
+    this.audioBuffer.push(audioBuffer);
     if (this.deepgramLive.getReadyState() === 1) {
-      const audioBuffer = Buffer.from(payload, "base64");
-      if (audioBuffer.length > 0) this.deepgramLive.send(audioBuffer);
-      else console.log(`deepgram: dropped empty audio buffer`);
+      const bufferedData = Buffer.concat(this.audioBuffer);
+      if (bufferedData.length > 0) {
+        this.deepgramLive.send(bufferedData);
+        this.audioBuffer = [];
+      }
     }
   }
 }
