@@ -68,9 +68,9 @@ export class TranscriptionService extends EventEmitter {
             console.log(`deepgram: transcript ${text}`);
 
             if (
-              PUNCTUATION_TERMINATORS.includes(text.slice(-1)) &&
-              (transcription.speech_final ||
-                PUNCTUATION_TERMINATORS.includes(this.finalResult.slice(-1)))
+              PUNCTUATION_TERMINATORS.includes(text.slice(-1)) ||
+              transcription.speech_final ||
+              PUNCTUATION_TERMINATORS.includes(this.finalResult.slice(-1))
             ) {
               this.finalResult += `${text}`;
               this.emit("transcription", this.finalResult);
