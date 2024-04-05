@@ -10,11 +10,13 @@ import { DEEPGRAM_API_KEY } from "utils/config";
 import { ActiveCallConfig } from "./activecall-service";
 
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
+const MAX_RETRY_ATTEMPTS = 3;
 
 export class TranscriptionService extends EventEmitter {
   private deepgramLive: LiveClient;
   private finalResult: string;
   private audioBuffer: Buffer[];
+  private retryAttempts: number;
 
   constructor() {
     super();
@@ -35,6 +37,7 @@ export class TranscriptionService extends EventEmitter {
 
     this.finalResult = "";
     this.audioBuffer = [];
+    this.retryAttempts = 0;
 
     this.deepgramLive.addListener(LiveTranscriptionEvents.Open, () => {
       this.deepgramLive.on(LiveTranscriptionEvents.Close, () => {
@@ -97,8 +100,37 @@ export class TranscriptionService extends EventEmitter {
     if (this.deepgramLive.getReadyState() === 1) {
       const bufferedData = Buffer.concat(this.audioBuffer);
       if (bufferedData.length > 0) {
-        this.deepgramLive.send(bufferedData);
+        // this.deepgramLive.send(bufferedData);
+        // this.audioBuffer = [];
+        this.sendBufferedData(bufferedData);
+      }
+    }
+  }
+
+  private sendBufferedData(bufferedData: Buffer) {
+    try {
+      this.deepgramLive.send(bufferedData);
+      this.audioBuffer = [];
+      this.retryAttempts = 0;
+    } catch (error) {
+      console.error("deepgram: error sending buffered data");
+      console.error(error);
+      this.retryAttempts++;
+
+      if (this.retryAttempts <= MAX_RETRY_ATTEMPTS) {
+        console.log(`deepgram: retrying send (attempt ${this.retryAttempts})`);
+        setTimeout(() => {
+          this.sendBufferedData(bufferedData);
+        }, 1000); // Retry after 1 second
+      } else {
+        console.error(
+          "deepgram: max retry attempts reached, discarding buffered data"
+        );
+        console.log(
+          `deepgram: number of lost audio packets: ${this.audioBuffer.length + 1}`
+        );
         this.audioBuffer = [];
+        this.retryAttempts = 0;
       }
     }
   }
