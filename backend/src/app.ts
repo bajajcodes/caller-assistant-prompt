@@ -1,22 +1,20 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { getChatMessages, intializeChatMessages } from "service/openai";
+import { hangupCall } from "scripts/hangup-call";
+import { makeOutboundCall } from "scripts/outbound-call";
+import { ActiveCallConfig } from "service/activecall-service";
 import { redisClient } from "service/redis";
-import { twilioClient } from "service/twilio";
-import twillio from "twilio";
+import { Message } from "types/call";
+import { MODELS } from "types/openai";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { $TSFixMe } from "types/common";
 import { STORE_KEYS } from "types/redis";
-import { TWILIO_FROM_NUMBER } from "utils/config";
 
-const VoiceResponse = twillio.twiml.VoiceResponse;
 const app: Express = express();
 
 app.use(cors());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(express.static("build"));
 
 app.use(async (req, _, next) => {
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
@@ -29,94 +27,85 @@ app.use(async (req, _, next) => {
 
 app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
-app.get("/callstatus", async (_, res) => {
-  const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
-  return res.json({ callStatus });
-});
-
-app.get("/applicationstatus", async (_, res) => {
-  const applicationStatus =
-    (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "NA";
-  return res.json({ applicationStatus });
-});
-
-app.get("/transcription", (_, res) => {
-  const chatMessages = getChatMessages();
-  const transcription = chatMessages.filter(
-    (message) => message.role === "user" || message.role === "assistant"
+app.get("/calllog/:callsid", async (req, res) => {
+  const sid = req.params.callsid;
+  const status = await redisClient.get(`${sid}__callstatus`);
+  const callTranscription = await redisClient.lRange(
+    `${sid}__transcription`,
+    0,
+    -1
   );
-  res.json({ transcription });
+  if (!status && !callTranscription) {
+    return res
+      .status(404)
+      .json({ message: `Call Details not found for CallSid: ${sid}.` });
+  }
+  const transcriptionParsed = callTranscription.map(
+    (message) => JSON.parse(message) as Message
+  );
+  const transcription = transcriptionParsed.filter(
+    (transcript) =>
+      transcript.role === "user" || transcript.role === "assistant"
+  );
+
+  return res.json({
+    sid,
+    status,
+    transcription,
+  });
 });
 
-app.post("/makeacall", async (req, res) => {
+app.post("/makeoutboundcall", async (req, res) => {
   try {
-    const twilioCallToNumber = req.body.twilioCallToNumber;
-    const providerData = req.body.providerData;
-    if (!twilioCallToNumber || !providerData) {
-      throw Error("Call To Number or Provider Data is Missing");
+    console.log(req.body);
+    const call = await makeOutboundCall(req.body.phoneNumber as string);
+
+    if (call?.sid) {
+      // Store the provider data in Redis using the call SID as the key
+      await redisClient.set(
+        `${call.sid}__providerdata`,
+        JSON.stringify(req.body)
+      );
+      ActiveCallConfig.getInstance().setCallConfig(
+        call.sid,
+        MODELS.GPT4_1106_PREVIEW,
+        500
+      );
+      res.json({
+        message: `Call initiated with CallSid: ${call.sid}`,
+        callSid: call.sid,
+        initiated: true,
+      });
+    } else {
+      res.status(400).json({
+        message: "Failed to initiate the call.",
+        initiated: false,
+      });
     }
-    if (!TWILIO_FROM_NUMBER) {
-      throw Error("Call From Number is Missing");
-    }
-    const response = new VoiceResponse();
-    const connect = response.connect();
-    response.say("");
-    connect.stream({
-      url: `${req.headers.wsProtocol}://${req.headers.host}`,
-      track: "inbound_track",
-    });
-    response.pause({
-      length: 120,
-    });
-    const twiml = response.toString();
-    const call = await twilioClient.calls.create({
-      twiml,
-      to: twilioCallToNumber,
-      from: TWILIO_FROM_NUMBER,
-      record: true,
-      statusCallback: `${req.headers.protocol}://${req.headers.host}/callupdate`,
-      statusCallbackMethod: "POST",
-      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
-    });
-    // await redisClient.hSet(call.sid, {
-    //   providerData,
-    //   callSid: call.sid,
-    //   callStatus: "",
-    //   applicationStatus: "",
-    // });
-    redisClient.set(STORE_KEYS.CALL_SID, call.sid);
-    redisClient.set(STORE_KEYS.PROVIDER_DATA, providerData);
-    redisClient.set(STORE_KEYS.APPLICATION_STATUS, "NA");
-    redisClient.set(STORE_KEYS.CALL_STATUS, "");
-    intializeChatMessages(providerData);
-    console.info(`Call initiated with SID: ${call.sid}`);
-    res.json({
-      message: `Call initiated with SID: ${call.sid}`,
-      callSid: call.sid,
-      callInitiated: true,
-    });
-  } catch (err: $TSFixMe) {
-    console.error({ err });
+  } catch (err: unknown) {
+    console.error(err);
     res.status(400).json({
-      message: "Failed to initiate call",
-      callInitiated: false,
+      message: `twilio: ${(err as Error)?.message || "failed to initiate call"}.`,
+      initiated: false,
     });
   }
 });
 
-app.post("/callupdate", async (req, res) => {
+app.post("/callstatusupdate", async (req, res) => {
   console.info(
     "Call Status Update:",
     req.body.CallStatus,
     "for Call SID:",
     req.body.CallSid
   );
-  // const call = await redisClient.hGetAll(req.body.callSid);
-  // await redisClient.hSet(call.callSid, {
-  //   ...call,
-  //   callStatus: req.body.CallStatus,
-  // });
-  redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
+  redisClient.set(`${req.body.CallSid}__callstatus`, req.body.CallStatus);
+  return res.status(200).send();
+});
+
+app.post("/hangupcall", async (req, res) => {
+  const callSid = req.body.callSid;
+  const isCallEnded = await hangupCall(callSid);
+  if (!isCallEnded) return res.status(400).send();
   return res.status(200).send();
 });
 

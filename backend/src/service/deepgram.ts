@@ -8,13 +8,13 @@ let deepgramClient: DeepgramClient;
 const connectDeepgram = () => {
   try {
     if (!DEEPGRAM_API_KEY) {
-      throw Error("Deepgram API Key is Missing");
+      throw Error("deepgram: api key is missing.");
     }
     deepgramClient = createClient(DEEPGRAM_API_KEY);
-    console.info("Connected to Deepgram Client");
+    console.info("deepgram: connected to deepgram client.");
   } catch (err: $TSFixMe) {
     const reason = err?.message;
-    console.error({ message: "Failed to Connect with Deepgram", reason });
+    console.error(`deepgram: ${reason || "Failed to Connect with Deepgram"}`);
     throw err;
   }
 };

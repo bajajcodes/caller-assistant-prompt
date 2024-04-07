@@ -1,6 +1,7 @@
 export enum MODELS {
   GPT4 = "gpt-4",
   GPT4_1106_PREVIEW = "gpt-4-1106-preview",
+  GPT_3_5_TUBRO = "gpt-3.5-turbo",
 }
 
 export enum ResponseType {
@@ -8,11 +9,6 @@ export enum ResponseType {
   SEND_DIGITS = "sendDigits",
   END_CALL = "endCall",
 }
-
-// export enum InputSource {
-//   HUMAN = "Human",
-//   IVR = "IVR",
-// }
 
 interface BaseResponse {
   responseType: ResponseType;
