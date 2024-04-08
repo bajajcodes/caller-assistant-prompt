@@ -87,6 +87,7 @@ export class TranscriptionService extends EventEmitter {
                 this.emitTranscription();
               }
             }
+            this.lastTranscriptionTime = currentTime;
           }
         }
       );

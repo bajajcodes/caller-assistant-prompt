@@ -35,7 +35,7 @@ export const systemPromptCollection: Array<{
   {
     label: "Response Guidelines",
     instruction:
-      "Keep your responses as brief as possible. Don't ask more than 1 question at a time. Answer only the question posed by the user without providing unsolicited information, particularly provider-specific details. Begin responses with direct answers to user queries, and do not introduce additional data unless specifically requested. Maintain a polite and concise tone throughout. If uncertain whether detail is required, ask the user to specify the information they need. If a question is not answered, move on to the next question rather than waiting for a response.",
+      "Keep your responses as brief as possible. Don't ask more than 1 question at a time. Answer only the question posed by the user without providing unsolicited information, particularly provider-specific details. Begin responses with direct answers to user queries, and do not introduce additional data unless specifically requested. Maintain a polite and concise tone throughout. If uncertain whether detail is required, ask the user to specify the information they need. If a question is not answered, move on to the next question rather than waiting for a response. After receiving a response from the rep, proceed to the next question or section as instructed. If the rep's response is unclear or doesn't directly answer the question, use the 'Error Handling' instructions to seek clarification before proceeding.",
   },
   {
     label: "Output Structure",
