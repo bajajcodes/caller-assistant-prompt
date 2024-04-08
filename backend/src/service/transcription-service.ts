@@ -11,12 +11,14 @@ import { ActiveCallConfig } from "./activecall-service";
 
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const MAX_RETRY_ATTEMPTS = 3;
+const DEBOUNCE_DELAY = 3000;
 
 export class TranscriptionService extends EventEmitter {
   private deepgramLive: LiveClient;
   private finalResult: string;
   private audioBuffer: Buffer[];
   private retryAttempts: number;
+  private lastTranscriptionTime: number;
 
   constructor() {
     super();
@@ -38,6 +40,7 @@ export class TranscriptionService extends EventEmitter {
     this.finalResult = "";
     this.audioBuffer = [];
     this.retryAttempts = 0;
+    this.lastTranscriptionTime = Date.now();
 
     this.deepgramLive.addListener(LiveTranscriptionEvents.Open, () => {
       this.deepgramLive.on(LiveTranscriptionEvents.Close, () => {
@@ -45,10 +48,7 @@ export class TranscriptionService extends EventEmitter {
         console.log(
           `deepgram: number of lost audio packets: ${this.audioBuffer.length + 1}`
         );
-        if (this.finalResult && this.finalResult.trim().length) {
-          this.emit("transcription", this.finalResult);
-          this.finalResult = "";
-        }
+        this.emitTranscription();
         this.audioBuffer = [];
       });
 
@@ -69,6 +69,7 @@ export class TranscriptionService extends EventEmitter {
 
           if (text) {
             console.log(`deepgram: transcript ${text}`);
+            const currentTime = Date.now();
 
             if (
               PUNCTUATION_TERMINATORS.includes(text.slice(-1)) ||
@@ -76,10 +77,15 @@ export class TranscriptionService extends EventEmitter {
               PUNCTUATION_TERMINATORS.includes(this.finalResult.slice(-1))
             ) {
               this.finalResult += `${text}`;
-              this.emit("transcription", this.finalResult);
-              this.finalResult = "";
+              this.emitTranscription();
             } else {
               this.finalResult += `${text}`;
+              if (currentTime - this.lastTranscriptionTime >= DEBOUNCE_DELAY) {
+                console.log(
+                  `deepgram: emiting transcription because of 3 seconds inactivity.`
+                );
+                this.emitTranscription();
+              }
             }
           }
         }
@@ -132,6 +138,13 @@ export class TranscriptionService extends EventEmitter {
         this.audioBuffer = [];
         this.retryAttempts = 0;
       }
+    }
+  }
+
+  private emitTranscription() {
+    if (this.finalResult && this.finalResult.trim().length) {
+      this.emit("transcription", this.finalResult);
+      this.finalResult = "";
     }
   }
 }

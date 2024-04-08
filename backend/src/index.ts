@@ -92,8 +92,7 @@ const startServer = async () => {
 
       streamService.on("callended", () => {
         console.log(`twilio: call has ended`);
-        //TODO: check if it requires to close the connection
-        // ws?.close?.();
+        ws?.close?.();
       });
     });
 

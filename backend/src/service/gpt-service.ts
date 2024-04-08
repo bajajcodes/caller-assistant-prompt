@@ -57,9 +57,12 @@ export class GPTService extends EventEmitter {
         response_format: {
           type: "json_object",
         },
+        temperature: 0,
+        max_tokens: 100,
       });
 
       const assistantPrompt = completeion.choices[0].message.content;
+      console.log(`gpt: ${JSON.stringify(assistantPrompt)}`);
       if (!assistantPrompt) {
         console.info(`gpt: GPT -> invalid assistant prompt`);
       } else {
