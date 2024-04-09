@@ -11,7 +11,8 @@ import { ActiveCallConfig } from "./activecall-service";
 
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const MAX_RETRY_ATTEMPTS = 3;
-const DEBOUNCE_DELAY = 3000;
+const DEBOUNCE_DELAY_IN_SECS = 5;
+const DEBOUNCE_DELAY = DEBOUNCE_DELAY_IN_SECS * 1000;
 
 export class TranscriptionService extends EventEmitter {
   private deepgramLive: LiveClient;
@@ -82,7 +83,7 @@ export class TranscriptionService extends EventEmitter {
               this.finalResult += `${text}`;
               if (currentTime - this.lastTranscriptionTime >= DEBOUNCE_DELAY) {
                 console.log(
-                  `deepgram: emiting transcription because of 3 seconds inactivity.`
+                  `deepgram: emiting transcription because of ${DEBOUNCE_DELAY_IN_SECS} seconds inactivity.`
                 );
                 this.emitTranscription();
               }
