@@ -52,7 +52,7 @@ export class GPTService extends EventEmitter {
         MODELS.GPT4_1106_PREVIEW;
       console.info(`gpt: model: ${model}`);
       const completeion = await this.openaiClient.chat.completions.create({
-        messages: this.context.filter((msg) => msg.role !== "assistant"),
+        messages: this.context,
         model,
         response_format: {
           type: "json_object",

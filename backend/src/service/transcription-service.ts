@@ -73,9 +73,9 @@ export class TranscriptionService extends EventEmitter {
             const currentTime = Date.now();
 
             if (
-              PUNCTUATION_TERMINATORS.includes(text.slice(-1)) ||
-              transcription.speech_final ||
-              PUNCTUATION_TERMINATORS.includes(this.finalResult.slice(-1))
+              (PUNCTUATION_TERMINATORS.includes(text.slice(-1)) ||
+                PUNCTUATION_TERMINATORS.includes(this.finalResult.slice(-1))) &&
+              transcription.speech_final
             ) {
               this.finalResult += `${text}`;
               this.emitTranscription();

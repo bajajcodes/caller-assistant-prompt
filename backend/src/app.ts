@@ -69,7 +69,7 @@ app.post("/makeoutboundcall", async (req, res) => {
       ActiveCallConfig.getInstance().setCallConfig(
         call.sid,
         MODELS.GPT4_1106_PREVIEW,
-        500
+        200
       );
       res.json({
         message: `Call initiated with CallSid: ${call.sid}`,
