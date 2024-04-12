@@ -15,6 +15,7 @@ const app: Express = express();
 app.use(cors());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(express.static("build"));
 
 app.use(async (req, _, next) => {
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
@@ -27,8 +28,14 @@ app.use(async (req, _, next) => {
 
 app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
-app.get("/calllog/:callsid", async (req, res) => {
-  const sid = req.params.callsid;
+app.get("/calllog/", async (req, res) => {
+  const sid = ActiveCallConfig.getInstance().getCallConfig()?.callSid;
+  if (!sid)
+    return res.status(400).json({
+      sid: "",
+      status: "",
+      transcription: [],
+    });
   const status = await redisClient.get(`${sid}__callstatus`);
   const callTranscription = await redisClient.lRange(
     `${sid}__transcription`,
@@ -57,7 +64,18 @@ app.get("/calllog/:callsid", async (req, res) => {
 
 app.post("/makeoutboundcall", async (req, res) => {
   try {
-    console.log(req.body);
+    const status = await redisClient.get(
+      `${ActiveCallConfig.getInstance().getCallConfig()?.callSid}__callstatus`
+    );
+    if (
+      status &&
+      !["completed", "busy", "no-answer", "canceled", "failed"].includes(status)
+    ) {
+      return res.status(400).json({
+        callSid: null,
+        message: "Failed to initiate the call, Another call is in progress.",
+      });
+    }
     const call = await makeOutboundCall(req.body.phoneNumber as string);
 
     if (call?.sid) {
@@ -72,21 +90,20 @@ app.post("/makeoutboundcall", async (req, res) => {
         200
       );
       res.json({
-        message: `Call initiated with CallSid: ${call.sid}`,
+        message: `Call initiated`,
         callSid: call.sid,
-        initiated: true,
       });
     } else {
       res.status(400).json({
         message: "Failed to initiate the call.",
-        initiated: false,
+        callSid: null,
       });
     }
   } catch (err: unknown) {
     console.error(err);
     res.status(400).json({
       message: `twilio: ${(err as Error)?.message || "failed to initiate call"}.`,
-      initiated: false,
+      callSid: null,
     });
   }
 });
@@ -103,7 +120,8 @@ app.post("/callstatusupdate", async (req, res) => {
 });
 
 app.post("/hangupcall", async (req, res) => {
-  const callSid = req.body.callSid;
+  const callSid = ActiveCallConfig.getInstance().getCallConfig()?.callSid;
+  if (!callSid) return res.status(400).send();
   const isCallEnded = await hangupCall(callSid);
   if (!isCallEnded) return res.status(400).send();
   return res.status(200).send();

@@ -45,6 +45,6 @@ export const makeOutboundCall = async (callTo: string) => {
   } catch (err: $TSFixMe) {
     const reason = err?.message || "failed to make a call";
     console.error(`twilio: ${reason}.`);
-    return null;
+    throw err;
   }
 };

@@ -1,4 +1,5 @@
 import { createServer } from "http";
+import { ActiveCallConfig } from "service/activecall-service";
 import { GPTService } from "service/gpt-service";
 import { connectRedis } from "service/redis";
 import { StreamService } from "service/stream-service";
@@ -92,6 +93,7 @@ const startServer = async () => {
 
       streamService.on("callended", () => {
         console.log(`twilio: call has ended`);
+        ActiveCallConfig.getInstance().deleteCallConfig();
         ws?.close?.();
       });
     });

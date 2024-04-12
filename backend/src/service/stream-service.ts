@@ -3,7 +3,6 @@ import twillio, { Twilio } from "twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse, ResponseType } from "types/openai";
 import { HOST, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
-import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
 
 const VoiceResponse = twillio.twiml.VoiceResponse;
@@ -58,7 +57,6 @@ export class StreamService extends EventEmitter {
         await this.twilioClient
           .calls(this.callSid)
           .update({ status: "completed" });
-        ActiveCallConfig.getInstance().deleteCallConfig();
         this.emit("callended");
       }
     } catch (err: $TSFixMe) {
@@ -79,7 +77,7 @@ export class StreamService extends EventEmitter {
 
         if (responseType === ResponseType.END_CALL) {
           //TODO: end the call after x miliseconds of silence
-          // await this.endCall();
+          await this.endCall();
         } else {
           if (responseType === ResponseType.SAY_FOR_VOICE) {
             response.say(content);

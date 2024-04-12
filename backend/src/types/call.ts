@@ -3,6 +3,12 @@ import { CallStatus } from "twilio/lib/rest/api/v2010/account/call";
 import { MODELS } from "./openai";
 
 export type Message = ChatCompletionMessageParam;
+export type CallTerminationStatus =
+  | "completed"
+  | "busy"
+  | "failed"
+  | "no-answer"
+  | "canceled";
 
 export enum CALL_APPLICATION_STATUS {
   REJCTED = "rejected",
