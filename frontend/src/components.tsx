@@ -4,18 +4,18 @@ import useSWRMutation from "swr/mutation";
 
 const API_BASE_URL = "";
 
-const resetCallContext = async () => {
-  const response = await fetch(`${API_BASE_URL}/reset`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-  return await response.json();
-};
+// const resetCallContext = async () => {
+//   const response = await fetch(`${API_BASE_URL}/reset`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//     },
+//   });
+//   return await response.json();
+// };
 
 const hangupCall = async () => {
-  const response = await fetch(`${API_BASE_URL}/hangup`, {
+  const response = await fetch(`${API_BASE_URL}/hangupcall`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -26,14 +26,14 @@ const hangupCall = async () => {
 
 const makeACallFetcher = async (
   _endpoint: string,
-  { arg }: { arg: { twilioCallToNumber: string; providerData: string } }
+  { arg }: { arg: { providerData: string } }
 ) => {
-  if (!arg.twilioCallToNumber || !arg.providerData) {
-    throw Error("Input's are missing");
+  if (!arg.providerData) {
+    throw Error("Provider Data is missing");
   }
-  const response = await fetch(`${API_BASE_URL}/makeacall`, {
+  const response = await fetch(`${API_BASE_URL}/makeoutboundcall`, {
     method: "POST",
-    body: JSON.stringify(arg),
+    body: arg.providerData,
     headers: {
       "Content-Type": "application/json",
     },
@@ -42,56 +42,49 @@ const makeACallFetcher = async (
 };
 
 const transcriptionFetcher = async () => {
-  const response = await fetch(`${API_BASE_URL}/transcription`);
+  const response = await fetch(`${API_BASE_URL}/calllog`);
   const data = await response.json();
   return data.transcription;
 };
 
 const getCallStatus = async () => {
-  const response = await fetch(`${API_BASE_URL}/callstatus`);
+  const response = await fetch(`${API_BASE_URL}/calllog`);
   const data = await response.json();
-  return data.callStatus;
+  return data.status;
 };
 
-const getApplicationStatus = async () => {
-  const response = await fetch(`${API_BASE_URL}/applicationstatus`);
-  const data = await response.json();
-  return { applicationStatus: data.applicationStatus, content: data.content };
-};
+// const getApplicationStatus = async () => {
+//   const response = await fetch(`${API_BASE_URL}/applicationstatus`);
+//   const data = await response.json();
+//   return { applicationStatus: data.applicationStatus, content: data.content };
+// };
 
 function MakeACallForm({
   onFormDataSubmit,
   isMutating,
 }: {
-  onFormDataSubmit: ({
-    twilioCallToNumber,
-    providerData,
-  }: {
-    twilioCallToNumber: string;
-    providerData: string;
-  }) => void;
+  onFormDataSubmit: ({ providerData }: { providerData: string }) => void;
   isMutating: boolean;
 }) {
   const onSubmit = (ev: React.FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
     const formData = new FormData(ev.currentTarget);
-    const twilioCallToNumber = formData.get("twilioCallToNumber") as string;
     const providerData = formData.get("providerData") as string;
-    onFormDataSubmit({ twilioCallToNumber, providerData });
+    onFormDataSubmit({ providerData });
   };
   return (
     <form className="flex flex-col gap-4" onSubmit={onSubmit}>
       <h1 className="text-4xl font-bold">Make Call Form</h1>
-      <label>
+      {/* <label>
         <p>Call To Number</p>
         <input
           name="twilioCallToNumber"
           className="focus:text-white"
           required
         />
-      </label>
+      </label> */}
       <label>
-        <p>Data or Data Presentation</p>
+        <p>Provider Data</p>
         <textarea
           className="h-96 max-h-96 w-full resize-y focus:text-white"
           name="providerData"
@@ -117,15 +110,19 @@ const FetchAndRenderCallInfo = ({
   data: Record<string, any>;
   isLoading: boolean;
 }) => {
+  if (isLoading)
+    return <p className="text-yellow-500 font-semibold">Loading...</p>;
   return (
     <div>
-      {!data?.callInitiated && data?.message && (
+      {!data?.callSid && data?.message && (
         <p className="text-red-500 font-semibold">{data.message}</p>
       )}
-      {data?.callInitiated && data?.message && (
-        <p className="text-green-500 font-semibold">{data.message}</p>
+      {data?.callSid && data?.message && (
+        <div>
+          <p className="text-green-500 font-semibold">{data.message}</p>
+          <p className="text-green-500 font-semibold">{data.callSid}</p>
+        </div>
       )}
-      {isLoading && <p className="text-yellow-500 font-semibold">Loading...</p>}
     </div>
   );
 };
@@ -175,65 +172,65 @@ export const FetchAndRenderTranscription = () => {
   );
 };
 
-export const FetchAndRenderApplicationStatus = () => {
-  const { data, isLoading } = useSWR(
-    "/applicationstatus",
-    getApplicationStatus,
-    {
-      refreshInterval: 10000,
-      revalidateIfStale: true,
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-    }
-  );
-  const {
-    data: mutationData,
-    trigger,
-    isMutating,
-  } = useSWRMutation("/applicationstatus", getApplicationStatus);
-  const rawApplicationStatus = (data || mutationData)?.applicationStatus;
-  const rawContent = (data || mutationData)?.content;
-  const applicationStatus =
-    data || mutationData ? (data || mutationData)?.applicationStatus : "";
-  const content = data || mutationData ? (data || mutationData)?.content : "";
-  const isDataAvailable = Boolean(rawApplicationStatus) || Boolean(rawContent);
-  return (
-    <div className="">
-      <div className="flex gap-4 items-center justify-center">
-        <h2 className="text-4xl font-bold text-white">Application Status</h2>
-        <button
-          type="button"
-          onClick={() => trigger()}
-          className="hover:ring-0 focus:ring-0 hover:border-none focus:border-none focus-within:ring-0"
-        >
-          🔃
-        </button>
-      </div>
-      {!isDataAvailable ? (
-        <>
-          <div className="text-base leading-8 text-gray-500">
-            {isLoading || isMutating
-              ? "Fetching Application Status"
-              : " Will be available in a moment."}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex flex-col gap-4">
-            <p>
-              <span className="font-semibold text-orange-500">
-                status:&nbsp;
-              </span>
-              <span className="leading-8">
-                {JSON.stringify(applicationStatus || content || "--")}
-              </span>
-            </p>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
+// export const FetchAndRenderApplicationStatus = () => {
+//   const { data, isLoading } = useSWR(
+//     "/applicationstatus",
+//     getApplicationStatus,
+//     {
+//       refreshInterval: 10000,
+//       revalidateIfStale: true,
+//       revalidateOnFocus: true,
+//       revalidateOnReconnect: true,
+//     }
+//   );
+//   const {
+//     data: mutationData,
+//     trigger,
+//     isMutating,
+//   } = useSWRMutation("/applicationstatus", getApplicationStatus);
+//   const rawApplicationStatus = (data || mutationData)?.applicationStatus;
+//   const rawContent = (data || mutationData)?.content;
+//   const applicationStatus =
+//     data || mutationData ? (data || mutationData)?.applicationStatus : "";
+//   const content = data || mutationData ? (data || mutationData)?.content : "";
+//   const isDataAvailable = Boolean(rawApplicationStatus) || Boolean(rawContent);
+//   return (
+//     <div className="">
+//       <div className="flex gap-4 items-center justify-center">
+//         <h2 className="text-4xl font-bold text-white">Application Status</h2>
+//         <button
+//           type="button"
+//           onClick={() => trigger()}
+//           className="hover:ring-0 focus:ring-0 hover:border-none focus:border-none focus-within:ring-0"
+//         >
+//           🔃
+//         </button>
+//       </div>
+//       {!isDataAvailable ? (
+//         <>
+//           <div className="text-base leading-8 text-gray-500">
+//             {isLoading || isMutating
+//               ? "Fetching Application Status"
+//               : " Will be available in a moment."}
+//           </div>
+//         </>
+//       ) : (
+//         <>
+//           <div className="flex flex-col gap-4">
+//             <p>
+//               <span className="font-semibold text-orange-500">
+//                 status:&nbsp;
+//               </span>
+//               <span className="leading-8">
+//                 {JSON.stringify(applicationStatus || content || "--")}
+//               </span>
+//             </p>
+//           </div>
+//         </>
+//       )}
+//     </div>
+//   );
+// };
 
 export const FetchAndRenderCallStatus = () => {
   const { data, isLoading } = useSWR("/callstatus", getCallStatus, {
@@ -271,11 +268,11 @@ export const FetchAndRenderCallStatus = () => {
 };
 
 export const HangupAndRestCall = () => {
-  const { trigger: reset } = useSWRMutation("/reset", resetCallContext);
+  // const { trigger: reset } = useSWRMutation("/reset", resetCallContext);
   const { trigger: hangup } = useSWRMutation("/hangup", hangupCall);
   return (
     <div className="flex flex-col gap-4">
-      <button
+      {/* <button
         onClick={() => {
           reset();
           window.alert(
@@ -285,7 +282,7 @@ export const HangupAndRestCall = () => {
         className="bg-orange-500 hover:bg-orange-500/90 text-white py-2 px-4 max-w-32 mx-auto w-full"
       >
         Reset Call
-      </button>
+      </button> */}
       <button
         onClick={() => {
           hangup();
