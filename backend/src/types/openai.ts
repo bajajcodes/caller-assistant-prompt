@@ -2,6 +2,7 @@ export enum MODELS {
   GPT4 = "gpt-4",
   GPT4_1106_PREVIEW = "gpt-4-1106-preview",
   GPT_3_5_TUBRO = "gpt-3.5-turbo",
+  GPT_4_TUBRO = "gpt-4-turbo",
 }
 
 export enum ResponseType {

@@ -86,8 +86,8 @@ app.post("/makeoutboundcall", async (req, res) => {
       );
       ActiveCallConfig.getInstance().setCallConfig(
         call.sid,
-        MODELS.GPT4_1106_PREVIEW,
-        200
+        MODELS.GPT_3_5_TUBRO,
+        350
       );
       res.json({
         message: `Call initiated`,

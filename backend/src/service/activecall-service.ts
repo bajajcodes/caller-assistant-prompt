@@ -64,7 +64,7 @@ export class ActiveCallConfig {
       );
       this.callConfig = {
         ...this.callConfig,
-        callModel: MODELS.GPT4_1106_PREVIEW,
+        callModel: MODELS.GPT_4_TUBRO,
         callEndpointing: 100,
       };
     }
