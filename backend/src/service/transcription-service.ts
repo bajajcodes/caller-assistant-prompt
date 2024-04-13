@@ -11,7 +11,7 @@ import { ActiveCallConfig } from "./activecall-service";
 
 const PUNCTUATION_TERMINATORS = [".", "!", "?"];
 const MAX_RETRY_ATTEMPTS = 3;
-const DEBOUNCE_DELAY_IN_SECS = 5;
+const DEBOUNCE_DELAY_IN_SECS = 3;
 const DEBOUNCE_DELAY = DEBOUNCE_DELAY_IN_SECS * 1000;
 
 export class TranscriptionService extends EventEmitter {
@@ -29,7 +29,7 @@ export class TranscriptionService extends EventEmitter {
       ActiveCallConfig.getInstance().getCallConfig()?.callEndpointing || 200;
     console.log(`deepgram: endpointing ${endpointing}ms`);
     this.deepgramLive = deepgram.listen.live({
-      model: "enhanced-phonecall",
+      model: "nova-2-phonecall",
       smart_format: true,
       encoding: "mulaw",
       sample_rate: 8000,
@@ -67,9 +67,9 @@ export class TranscriptionService extends EventEmitter {
           if (alternatives) {
             text = alternatives[0]?.transcript.trim();
           }
+          console.log(`deepgram: transcript ${text}`);
 
           if (text) {
-            console.log(`deepgram: transcript ${text}`);
             const currentTime = Date.now();
 
             if (
