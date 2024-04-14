@@ -18,6 +18,6 @@ export const hangupCall = async (callSid: string) => {
   } catch (err: $TSFixMe) {
     const reason = err?.message;
     console.error(`twilio: ${reason || "failed to hangup call."}`);
-    return false;
+    throw err;
   }
 };

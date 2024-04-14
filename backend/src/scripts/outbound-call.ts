@@ -12,13 +12,13 @@ import {
 export const makeOutboundCall = async (callTo: string) => {
   try {
     if (!HOST) {
-      throw Error("twilio: host address is missing.");
+      throw Error("host address is missing.");
     }
     if (!TWILIO_FROM_NUMBER) {
-      throw Error("twilio: call from number is missing.");
+      throw Error("call from number is missing.");
     }
     if (!callTo) {
-      throw Error("twilio: call to number is missing.");
+      throw Error("call to phone number is missing.");
     }
     const response = new VoiceResponse();
     const connect = response.connect();
@@ -44,7 +44,7 @@ export const makeOutboundCall = async (callTo: string) => {
     return call;
   } catch (err: $TSFixMe) {
     const reason = err?.message || "failed to make a call";
-    console.error(`twilio: ${reason}.`);
-    return null;
+    console.error(reason);
+    throw err;
   }
 };

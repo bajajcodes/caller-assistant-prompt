@@ -61,7 +61,6 @@ app.post("/makeoutboundcall", async (req, res) => {
     const call = await makeOutboundCall(req.body.phoneNumber as string);
 
     if (call?.sid) {
-      // Store the provider data in Redis using the call SID as the key
       await redisClient.set(
         `${call.sid}__providerdata`,
         JSON.stringify(req.body)
@@ -72,21 +71,20 @@ app.post("/makeoutboundcall", async (req, res) => {
         350
       );
       res.json({
-        message: `Call initiated with CallSid: ${call.sid}`,
+        message: `Call initiated`,
         callSid: call.sid,
-        initiated: true,
       });
     } else {
       res.status(400).json({
         message: "Failed to initiate the call.",
-        initiated: false,
+        callSid: null,
       });
     }
   } catch (err: unknown) {
     console.error(err);
     res.status(400).json({
       message: `twilio: ${(err as Error)?.message || "failed to initiate call"}.`,
-      initiated: false,
+      callSid: null,
     });
   }
 });
@@ -104,9 +102,13 @@ app.post("/callstatusupdate", async (req, res) => {
 
 app.post("/hangupcall", async (req, res) => {
   const callSid = req.body.callSid;
-  const isCallEnded = await hangupCall(callSid);
-  if (!isCallEnded) return res.status(400).send();
-  return res.status(200).send();
+  try {
+    const isCallEnded = await hangupCall(callSid);
+    if (!isCallEnded) return res.status(400).send();
+    return res.status(200).send();
+  } catch (err) {
+    return res.status(400).send();
+  }
 });
 
 export default app;
