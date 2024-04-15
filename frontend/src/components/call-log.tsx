@@ -3,7 +3,7 @@ import useSWR from "swr";
 import { CallContext } from "./call-context";
 import { Button } from "./ui/button";
 
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = "";
 
 const fetcher = async (url: string) => {
   const response = await fetch(url);
@@ -36,7 +36,7 @@ export const CallLog = () => {
 
   return (
     <div className="flex flex-col gap-4 md:gap-2">
-      <div className="flex gap-2">
+      <div className="grid grid-cols-[180px_160px] gap-2">
         <div className="grid gap-1">
           <h3 className="text-lg font-medium">Call Status</h3>
           {!callSid || callSid === "NA" ? (
@@ -47,7 +47,7 @@ export const CallLog = () => {
             <p className="text-sm text-gray-500">Loading call status...</p>
           ) : (
             <p className="text-sm text-gray-500 leading-none">
-              The call is <strong>{data.status}</strong>.
+              The call is <strong>{data.status || "--"}</strong>.
             </p>
           )}
         </div>
@@ -73,15 +73,21 @@ export const CallLog = () => {
             <p className="text-sm text-gray-500">
               Loading call transcription...
             </p>
+          ) : data.transcription?.length ? (
+            <div className="max-h-[50vh] overflow-scroll p-2 border-2">
+              {data.transcription.map(
+                (message: { role: string; content: string }, index: number) => (
+                  <p key={index} className="text-sm">
+                    <span className="font-medium">{message.role}: </span>
+                    {message.content}
+                  </p>
+                )
+              )}
+            </div>
           ) : (
-            data.transcription.map(
-              (message: { role: string; content: string }, index: number) => (
-                <p key={index} className="text-sm">
-                  <span className="font-medium">{message.role}: </span>
-                  {message.content}
-                </p>
-              )
-            )
+            <p className="text-sm text-gray-500">
+              Fetching call transcription...
+            </p>
           )}
         </div>
       </div>

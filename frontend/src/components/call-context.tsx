@@ -26,7 +26,7 @@ const hangupCallFetcher = async (
     },
     body: JSON.stringify(payload),
   });
-  return await response.json();
+  return response.status === 200;
 };
 
 export const CallProvider = ({
@@ -39,8 +39,8 @@ export const CallProvider = ({
     `${API_BASE_URL}/hangupcall`,
     hangupCallFetcher,
     {
-      onSuccess: (data) => {
-        if (data.success) {
+      onSuccess: (done) => {
+        if (done) {
           setCallSid(null);
         } else {
           console.error("Error while hanging up the call");

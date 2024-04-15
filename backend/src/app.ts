@@ -104,8 +104,7 @@ app.post("/callstatusupdate", async (req, res) => {
 app.post("/hangupcall", async (req, res) => {
   const callSid = req.body.callSid;
   try {
-    const isCallEnded = await hangupCall(callSid);
-    if (!isCallEnded) return res.status(400).send();
+    await hangupCall(callSid);
     return res.status(200).send();
   } catch (err) {
     return res.status(400).send();

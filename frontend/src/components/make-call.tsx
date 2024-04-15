@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = "";
 
 const makeACallFetcher = async (
   _endpoint: string,
