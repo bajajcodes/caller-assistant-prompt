@@ -15,6 +15,7 @@ const app: Express = express();
 app.use(cors());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(express.static("dist"));
 
 app.use(async (req, _, next) => {
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";

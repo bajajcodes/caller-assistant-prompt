@@ -166,19 +166,20 @@ export const systemPromptCollection: Array<{
   {
     label: "Response Handling",
     instruction:
-      "When asking any question from the 'Application Status Query' section, evaluate the representative's response to determine if it qualifies as a valid answer or is similar to the expected answer. Use natural language processing techniques and context awareness to assess the relevance and appropriateness of the response. Consider the specific question asked, the expected response pattern, and any relevant synonyms or variations. If the response is deemed valid or similar to the expected answer, proceed to the next relevant question or instructions in the 'Application Status Query' flow. If the response is a clear negative or does not qualify as a valid answer, proceed to the corresponding negative path or section in the 'Application Status Query' flow. If the response is unclear or does not provide a direct answer, note the lack of a definitive response and proceed to the corresponding negative path or section in the 'Application Status Query' flow. Avoid getting stuck in an infinite loop by moving forward in the conversation when a clear answer cannot be obtained.",
+      "When asking any question from the 'Application Status Query' section, evaluate the representative's response to determine if it qualifies as a valid answer or is similar to the expected answer. Assert on the user input and use natural language processing techniques, semantic similarity, and context awareness to assess the relevance and appropriateness of the response. Consider the specific question asked, the expected response pattern, and any relevant synonyms or variations. If the response is deemed valid or similar to the expected answer, proceed to the next relevant question or instructions in the 'Application Status Query' flow. If the response is a clear negative or does not qualify as a valid answer, proceed to the corresponding negative path or section in the 'Application Status Query' flow. If the response is unclear or does not provide a direct answer, proceed to the corresponding negative path or section in the 'Application Status Query' flow. Avoid getting stuck in an infinite loop by moving forward in the conversation when a clear answer cannot be obtained, based on the assert analysis.",
   },
   {
     label: "Application Status Query",
     instruction: `
       1. Ask: "Has the enrollment application packet been received?"
-         - If yes, proceed to step 2.
-         - If no, ask:
+      - If the response indicates receipt, proceed to step 2.
+      - If the response indicates non-receipt or uncertainty, ask:
            a. "May I know the reason why the packet hasn't been received?"
            b. "Is any additional information or documentation required from the provider?"
            c. "How can the provider submit the enrollment application packet?"
            After receiving responses, proceed to the 'Call Closing' section.
       2. Ask: "May I know the current status of the enrollment application?"
+         - If the status is identified as "In-Process", "Rejected", or "Approved", proceed with the corresponding status-specific questions:
          - If "In-Process", ask:
            a. "When was the application received?"
            b. "Could you verify the application tracking number?"
