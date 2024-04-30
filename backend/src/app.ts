@@ -36,6 +36,11 @@ app.get("/calllog/:callsid", async (req, res) => {
     0,
     -1
   );
+  const callIVRTranscription = await redisClient.lRange(
+    `${sid}__ivr--transcription`,
+    0,
+    -1
+  );
   if (!status && !callTranscription) {
     return res
       .status(404)
@@ -44,7 +49,14 @@ app.get("/calllog/:callsid", async (req, res) => {
   const transcriptionParsed = callTranscription.map(
     (message) => JSON.parse(message) as Message
   );
+  const ivrParsed = callIVRTranscription.map(
+    (message) => JSON.parse(message) as Message
+  );
   const transcription = transcriptionParsed.filter(
+    (transcript) =>
+      transcript.role === "user" || transcript.role === "assistant"
+  );
+  const ivrTranscription = ivrParsed.filter(
     (transcript) =>
       transcript.role === "user" || transcript.role === "assistant"
   );
@@ -53,6 +65,7 @@ app.get("/calllog/:callsid", async (req, res) => {
     sid,
     status,
     transcription,
+    ivrTranscription,
   });
 });
 
@@ -68,8 +81,8 @@ app.post("/makeoutboundcall", async (req, res) => {
       );
       ActiveCallConfig.getInstance().setCallConfig(
         call.sid,
-        MODELS.GPT_3_5_TUBRO,
-        350
+        MODELS.GPT_4_TUBRO,
+        1000
       );
       res.json({
         message: `Call initiated`,

@@ -1,10 +1,14 @@
 import { createServer } from "http";
+import { isCallTransfered } from "scripts/iscall-transfered";
+import { ActiveCallConfig } from "service/activecall-service";
 import { GPTService } from "service/gpt-service";
+import { IVRService } from "service/ivr-service";
 import { connectRedis } from "service/redis";
 import { StreamService } from "service/stream-service";
 import { TranscriptionService } from "service/transcription-service";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
+import { colorErr, colorInfo, colorSuccess, colorUpdate } from "utils/colorCli";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
@@ -25,6 +29,7 @@ const startServer = async () => {
       const streamService = new StreamService(ws);
       const transcriptionService = new TranscriptionService();
       const gptService = new GPTService();
+      const ivrService = new IVRService([]);
 
       ws.on("message", (data: $TSFixMe) => {
         const twilioMessage = JSON.parse(data);
@@ -36,6 +41,7 @@ const startServer = async () => {
           streamService.setStreamSid(streamSid);
           streamService.setCallSid(callSid);
           gptService.setCallSid(callSid);
+          ivrService.setCallSid(callSid);
           console.log(`socket -> Starting Media Stream for ${streamSid}`);
         }
 
@@ -64,12 +70,52 @@ const startServer = async () => {
         // TODO: Implement any necessary cleanup or termination logic
       });
 
+      transcriptionService.on("utterance", async (text: string) => {
+        // This is a bit of a hack to filter out empty utterances
+        if (text?.length > 5) {
+          console.log(colorErr("Twilio -> Interruption, Clearing stream"));
+          console.log({ text });
+          // ws.send(
+          //   JSON.stringify({
+          //     streamSid,
+          //     event: "clear",
+          //   })
+          // );
+        }
+      });
+
       transcriptionService.on("transcription", async (text: string) => {
         if (!text) {
           return;
         }
-        console.log(`transcription: ${text}`);
-        gptService.completion(text);
+        console.log(colorSuccess(`transcription: ${text}`));
+        if (
+          ActiveCallConfig.getInstance().getCallConfig()
+            ?.isLastIvrMenuOptionUsed &&
+          !ActiveCallConfig.getInstance().getCallConfig()
+            ?.isIVRNavigationCompleted
+        ) {
+          isCallTransfered(text).then((isTransfered) => {
+            if (!isTransfered) return;
+            ActiveCallConfig.getInstance().setIVRNavigationCompleted();
+          });
+        }
+        if (
+          ActiveCallConfig.getInstance().getCallConfig()
+            ?.isIVRNavigationCompleted
+        ) {
+          gptService.completion(text);
+        } else {
+          ivrService.handleResponse(text);
+        }
+        console.log(
+          colorUpdate(
+            `isIVRNavigationCompleted: ${
+              ActiveCallConfig.getInstance().getCallConfig()
+                ?.isIVRNavigationCompleted
+            }`
+          )
+        );
       });
 
       transcriptionService.on("transcriptionerror", () => {
@@ -77,13 +123,21 @@ const startServer = async () => {
       });
 
       gptService.on("gptreply", async (gptReply: AssistantResponse) => {
-        console.log(`gpt: GPT -> TTS: ${gptReply.content}`);
-        console.log(`gpt: response-type:${gptReply.responseType}`);
+        console.log(colorInfo(`gpt: GPT -> TTS: ${gptReply.content}`));
+        console.log(colorInfo(`gpt: response-type:${gptReply.responseType}`));
         streamService.sendTwiml(gptReply);
       });
 
       gptService.on("gpterror", () => {
         streamService.endCall();
+      });
+
+      ivrService.on("ivrreply", async (ivrReply: AssistantResponse) => {
+        console.log(colorInfo(`ivrservice: IVR -> TTS: ${ivrReply.content}`));
+        console.log(
+          colorInfo(`ivrservice: response-type:${ivrReply.responseType}`)
+        );
+        streamService.sendTwiml(ivrReply);
       });
 
       streamService.on("twimlsent", () => {
@@ -94,6 +148,14 @@ const startServer = async () => {
         console.log(`twilio: call has ended`);
         ws?.close?.();
       });
+    });
+
+    wss.on("error", (err) => {
+      console.error(
+        colorErr(
+          `Message: ${err?.message} Cause: ${err?.cause} Name: ${err.name}`
+        )
+      );
     });
 
     console.info(`server: listening on port ${PORT}.`);

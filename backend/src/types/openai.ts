@@ -11,7 +11,7 @@ export enum ResponseType {
   END_CALL = "endCall",
 }
 
-interface BaseResponse {
+export interface BaseResponse {
   responseType: ResponseType;
   content: string;
 }
