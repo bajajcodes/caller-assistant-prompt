@@ -23,7 +23,7 @@ export const isCallTransfered = async (userInput: string) => {
       max_tokens: 3,
     });
     const message = completeion.choices[0].message.content;
-    const isTransfered = message === "Yes" || message === "yes";
+    const isTransfered = message ? ["Yes", "yes"].includes(message) : false;
     console.log(
       colorInfo(
         `call transfered -> isTransfered:${isTransfered} message: ${message} transcription:${userInput}`

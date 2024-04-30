@@ -20,7 +20,9 @@ const getSystemRoleMessage = (
     label: "Data Presentation or Data",
     instruction: providerDataStringified.replaceAll("\t", " "),
   };
-  const content = [...systemPromptCollection, data].reduce(
+  const promptCollection = systemPromptCollection;
+  const prompt = [...promptCollection, data];
+  const content = prompt.reduce(
     (prompt, item) => `${prompt} ${item.label}:${item.instruction} `,
     ""
   );
@@ -49,10 +51,10 @@ export class GPTService extends EventEmitter {
       this.updateUserContext({ role: "user", content: text });
       const model =
         ActiveCallConfig.getInstance().getCallConfig()?.callModel ||
-        MODELS.GPT4_1106_PREVIEW;
+        MODELS.GPT_4_TUBRO;
       console.info(`gpt: model: ${model}`);
       const completeion = await this.openaiClient.chat.completions.create({
-        messages: this.context.filter((msg) => msg.role !== "assistant"),
+        messages: this.context,
         model,
         response_format: {
           type: "json_object",
@@ -61,7 +63,9 @@ export class GPTService extends EventEmitter {
         max_tokens: 100,
       });
 
+      console.log(completeion.choices[0].message.content);
       const assistantPrompt = completeion.choices[0].message.content;
+
       console.log(`gpt: ${JSON.stringify(assistantPrompt)}`);
       if (!assistantPrompt) {
         console.info(`gpt: GPT -> invalid assistant prompt`);
@@ -98,8 +102,6 @@ export class GPTService extends EventEmitter {
     const providerDataStringified = await redisClient.get(
       `${this.callSid}__providerdata`
     );
-    //TODO: handle what if provider data is not available
-    //INFO: Ideally it will never happen
     const providerData = providerDataStringified
       ? JSON.parse(providerDataStringified)
       : {};

@@ -2,6 +2,7 @@ import EventEmitter from "events";
 import twillio, { Twilio } from "twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse, ResponseType } from "types/openai";
+import { colorErr, colorUpdate } from "utils/colorCli";
 import { HOST, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
 import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
@@ -96,13 +97,18 @@ export class StreamService extends EventEmitter {
           response.pause({ length: 90 });
 
           const twiml = response.toString();
-
-          await this.twilioClient.calls(this.callSid).update({ twiml });
-          this.emit("twimlsent");
+          console.log(colorUpdate(twiml));
+          if (twiml && twiml?.trim?.().length) {
+            await this.twilioClient.calls(this.callSid).update({ twiml });
+            this.emit("twimlsent");
+          }
         }
       }
     } catch (err: $TSFixMe) {
-      console.error(`twilio: ${err?.message || "Failed to send twiml"}`);
+      console.error(
+        colorErr(`twilio: ${err?.message || "Failed to send twiml"}`)
+      );
+      console.error(colorErr(err));
       if (err?.code !== 21220) {
         this.endCall();
       }

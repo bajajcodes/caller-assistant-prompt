@@ -1,9 +1,12 @@
 import { MODELS } from "types/openai";
+import { colorWarn } from "utils/colorCli";
 
 interface CallConfig {
   callSid: string;
   callModel: MODELS;
   callEndpointing: number;
+  isIVRNavigationCompleted: boolean;
+  isLastIvrMenuOptionUsed: boolean;
 }
 
 export class ActiveCallConfig {
@@ -32,6 +35,8 @@ export class ActiveCallConfig {
       callSid,
       callModel,
       callEndpointing,
+      isIVRNavigationCompleted: false,
+      isLastIvrMenuOptionUsed: false,
     };
 
     // Clear any existing timer
@@ -40,12 +45,28 @@ export class ActiveCallConfig {
     }
 
     // Set a new timer to reset the call configuration after 1 minute and 30 seconds
-    this.timer = setTimeout(() => {
-      this.resetCallConfig();
-    }, 90000); // 1 minute and 30 seconds = 90000 milliseconds
+    // this.timer = setTimeout(() => {
+    //   this.resetCallConfig();
+    // }, 90000); // 1 minute and 30 seconds = 90000 milliseconds
   }
 
-  public getCallConfig(): CallConfig | null {
+  public setIVRNavigationCompleted() {
+    if (!this.callConfig) return;
+    console.log(colorWarn(`IVR Navigation Completed`));
+    this.callConfig.isIVRNavigationCompleted = true;
+  }
+
+  public setIsLastIVRMenuOptionUsed() {
+    if (!this.callConfig) return;
+    this.callConfig.isLastIvrMenuOptionUsed = true;
+  }
+
+  public setEndpointing(endpointing: number) {
+    if (!this.callConfig) return;
+    this.callConfig.callEndpointing = endpointing;
+  }
+
+  public getCallConfig() {
     return this.callConfig;
   }
 
@@ -66,6 +87,7 @@ export class ActiveCallConfig {
         ...this.callConfig,
         callModel: MODELS.GPT_4_TUBRO,
         callEndpointing: 100,
+        isIVRNavigationCompleted: this.callConfig.isIVRNavigationCompleted,
       };
     }
   }
