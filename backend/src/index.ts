@@ -29,7 +29,23 @@ const startServer = async () => {
       const streamService = new StreamService(ws);
       const transcriptionService = new TranscriptionService();
       const gptService = new GPTService();
-      const ivrService = new IVRService([]);
+      const ivrService = new IVRService([
+        {
+          intent: "Reason for your Call",
+          response: "credentialing",
+          triggers: ["reason for your call"],
+        },
+        {
+          intent: "Confirm Reason for Call",
+          response: "credentialing",
+          triggers: ["calling about credentialing"],
+        },
+        {
+          intent: "Calling For",
+          response: "credentialing",
+          triggers: ["say credentialing"],
+        },
+      ]);
 
       ws.on("message", (data: $TSFixMe) => {
         const twilioMessage = JSON.parse(data);
@@ -74,13 +90,13 @@ const startServer = async () => {
         // This is a bit of a hack to filter out empty utterances
         if (text?.length > 5) {
           console.log(colorErr("Twilio -> Interruption, Clearing stream"));
-          console.log({ text });
-          // ws.send(
-          //   JSON.stringify({
-          //     streamSid,
-          //     event: "clear",
-          //   })
-          // );
+          console.log(colorErr(text));
+          ws.send(
+            JSON.stringify({
+              streamSid,
+              event: "clear",
+            })
+          );
         }
       });
 

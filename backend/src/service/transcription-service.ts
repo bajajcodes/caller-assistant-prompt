@@ -1,5 +1,6 @@
 import {
   LiveClient,
+  LiveSchema,
   LiveTranscriptionEvent,
   LiveTranscriptionEvents,
   createClient,
@@ -23,7 +24,7 @@ export class TranscriptionService extends EventEmitter {
   constructor() {
     super();
     const deepgram = createClient(DEEPGRAM_API_KEY || "");
-    this.deepgramLive = deepgram.listen.live({
+    const transcriptionOptions: LiveSchema = {
       model: "nova-2-phonecall",
       smart_format: true,
       encoding: "mulaw",
@@ -31,8 +32,17 @@ export class TranscriptionService extends EventEmitter {
       channels: 1,
       interim_results: true,
       endpointing: 200,
-      utterance_end_ms: 1000,
-    });
+      utterance_end_ms: ActiveCallConfig.getInstance().getCallConfig()
+        ?.isIVRNavigationCompleted
+        ? 1500
+        : 1000,
+      // utterance_end_ms: 1000,
+      // endpointing: ActiveCallConfig.getInstance().getCallConfig()
+      //   ?.isIVRNavigationCompleted
+      //   ? 400
+      //   : 200,
+    };
+    this.deepgramLive = deepgram.listen.live(transcriptionOptions);
 
     this.finalResult = "";
     this.audioBuffer = [];

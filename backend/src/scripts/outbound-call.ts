@@ -37,6 +37,7 @@ export const makeOutboundCall = async (callTo: string) => {
       to: callTo,
       from: TWILIO_FROM_NUMBER,
       record: true,
+      recordingChannels: "dual",
       statusCallback: `https://${HOST}/callstatusupdate`,
       statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
