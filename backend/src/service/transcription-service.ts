@@ -31,16 +31,14 @@ export class TranscriptionService extends EventEmitter {
       sample_rate: 8000,
       channels: 1,
       interim_results: true,
-      endpointing: 200,
+      endpointing: ActiveCallConfig.getInstance().getCallConfig()
+        ?.isIVRNavigationCompleted
+        ? 400
+        : 200,
       utterance_end_ms: ActiveCallConfig.getInstance().getCallConfig()
         ?.isIVRNavigationCompleted
         ? 1500
         : 1000,
-      // utterance_end_ms: 1000,
-      // endpointing: ActiveCallConfig.getInstance().getCallConfig()
-      //   ?.isIVRNavigationCompleted
-      //   ? 400
-      //   : 200,
     };
     this.deepgramLive = deepgram.listen.live(transcriptionOptions);
 
@@ -123,14 +121,11 @@ export class TranscriptionService extends EventEmitter {
   }
 
   send(payload: $TSFixMe) {
-    // TODO: Buffer up the media and then send
     const audioBuffer = Buffer.from(payload, "base64");
     this.audioBuffer.push(audioBuffer);
     if (this.deepgramLive.getReadyState() === 1) {
       const bufferedData = Buffer.concat(this.audioBuffer);
       if (bufferedData.length > 0) {
-        // this.deepgramLive.send(bufferedData);
-        // this.audioBuffer = [];
         this.sendBufferedData(bufferedData);
       }
     }
