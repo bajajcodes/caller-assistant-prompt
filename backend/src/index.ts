@@ -23,9 +23,6 @@ const startServer = async () => {
 
       console.info("socket: new client connected.");
 
-      //TODO: pass ws to all services to close the ws connection on close/error
-      //TOOD: end the call on error
-      //TODO: end the call if status is terminated
       const streamService = new StreamService(ws);
       const transcriptionService = new TranscriptionService();
       const gptService = new GPTService();
@@ -46,6 +43,8 @@ const startServer = async () => {
           triggers: ["say credentialing"],
         },
       ]);
+      // let marks = [];
+      let interactionCount = 0;
 
       ws.on("message", (data: $TSFixMe) => {
         const twilioMessage = JSON.parse(data);
@@ -120,7 +119,13 @@ const startServer = async () => {
           ActiveCallConfig.getInstance().getCallConfig()
             ?.isIVRNavigationCompleted
         ) {
-          gptService.completion(text);
+          console.log(
+            colorUpdate(
+              `Interaction ${interactionCount} – deepgram -> GPT: ${text}`
+            )
+          );
+          gptService.completion(text, interactionCount);
+          interactionCount += 1;
         } else {
           ivrService.handleResponse(text);
         }
@@ -138,11 +143,26 @@ const startServer = async () => {
         streamService.endCall();
       });
 
-      gptService.on("gptreply", async (gptReply: AssistantResponse) => {
-        console.log(colorInfo(`gpt: GPT -> TTS: ${gptReply.content}`));
-        console.log(colorInfo(`gpt: response-type:${gptReply.responseType}`));
-        streamService.sendTwiml(gptReply);
-      });
+      gptService.on(
+        "gptreply",
+        async (
+          gptReply: AssistantResponse,
+          partialResponseIndex,
+          icount: number
+        ) => {
+          console.log(
+            colorInfo(
+              `Interaction ${icount}: gpt: GPT -> TTS: ${gptReply.content}`
+            )
+          );
+          console.log(
+            colorInfo(
+              `Interaction ${icount}: gpt: response-type:${gptReply.responseType}`
+            )
+          );
+          streamService.sendTwiml(gptReply, partialResponseIndex, icount);
+        }
+      );
 
       gptService.on("gpterror", () => {
         streamService.endCall();
@@ -153,12 +173,19 @@ const startServer = async () => {
         console.log(
           colorInfo(`ivrservice: response-type:${ivrReply.responseType}`)
         );
-        streamService.sendTwiml(ivrReply);
+        streamService.sendTwiml(ivrReply, -1, -1);
       });
 
-      streamService.on("twimlsent", () => {
-        console.log(`twilio: update has been sent`);
-      });
+      streamService.on(
+        "twimlsent",
+        (partialResponseIndex: number, icount: number) => {
+          console.log(
+            colorInfo(
+              `PartialResponseIndex:${partialResponseIndex} InteractionCount: ${icount}, twilio -> update has been sent`
+            )
+          );
+        }
+      );
 
       streamService.on("callended", () => {
         console.log(`twilio: call has ended`);
