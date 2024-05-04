@@ -8,11 +8,11 @@
     {
       "intent": "Enter NPI",
       "triggers": ["10 digit npi"],
-      "response": "1720574346"
+      "response": "1689625543"
     },
     {
       "intent": "Verify NPI",
-      "triggers": ["17205 74346 is this correct"],
+      "triggers": ["1689625543 is this correct"],
       "response": "1"
     },
     {
@@ -187,6 +187,5 @@
       "triggers": ["you entered 844659769", "you entered 8446 59769"],
       "response": "Yes"
     }
-  ],
-  "": []
+  ]
 }

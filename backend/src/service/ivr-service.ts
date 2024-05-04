@@ -33,17 +33,23 @@ export class IVRService extends EventEmitter {
     });
     const transcriptFormatted = transcript
       .toLowerCase()
-      .replace(/[^a-zA-Z0-9\s]/g, "");
+      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .replace(/(\d)\s+(\d)/g, "$1$2");
+
     console.info(colorInfo(`ivrservice: ${transcriptFormatted}`));
     const match = this.ivrMenu.find((menu) =>
       menu.triggers.some((trigger) => transcriptFormatted.includes(trigger))
     );
     if (!match) {
-      console.log(colorWarn(`ivrservice: No Match for: ${transcript}`));
+      console.log(
+        colorWarn(`ivrservice: No Match for: ${transcriptFormatted}`)
+      );
       return;
     }
     console.log(
-      colorSuccess(`ivrservice: Match, ${match.response} for: ${transcript}`)
+      colorSuccess(
+        `ivrservice: Match, ${match.response} for: ${transcriptFormatted}`
+      )
     );
     const ivrReply: BaseResponse = {
       content: match.response,

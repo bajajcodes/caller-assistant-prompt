@@ -67,7 +67,11 @@ export class StreamService extends EventEmitter {
     }
   }
 
-  async sendTwiml(message: AssistantResponse) {
+  async sendTwiml(
+    message: AssistantResponse,
+    partialResponseIndex: number,
+    icount: number
+  ) {
     try {
       const isCallTerminated = await this.isCallTerminated();
       if (isCallTerminated) {
@@ -100,7 +104,7 @@ export class StreamService extends EventEmitter {
           console.log(colorUpdate(twiml));
           if (twiml && twiml?.trim?.().length) {
             await this.twilioClient.calls(this.callSid).update({ twiml });
-            this.emit("twimlsent");
+            this.emit("twimlsent", partialResponseIndex, icount);
           }
         }
       }

@@ -1,10 +1,10 @@
 import EventEmitter from "events";
 import OpenAI from "openai";
 import { ChatCompletionSystemMessageParam } from "openai/resources/index.mjs";
-import { AssistantResponse, MODELS } from "types/openai";
+import { AssistantResponse, MODELS, ResponseType } from "types/openai";
+import { colorInfo, colorWarn } from "utils/colorCli";
 import { OPEN_AI_KEY } from "utils/config";
 import { systemPromptCollection } from "utils/data";
-import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
 
 type Message = {
@@ -33,6 +33,7 @@ export class GPTService extends EventEmitter {
   private openaiClient: OpenAI;
   private callSid: string;
   private context: Array<Message>;
+  private partialResponseIndex = 0;
 
   constructor() {
     super();
@@ -46,41 +47,57 @@ export class GPTService extends EventEmitter {
     this.context = await this.getCallTranscription();
   }
 
-  async completion(text: string) {
+  async completion(text: string, interactionCount: number) {
     try {
+      let completeResponse = "";
+      let partialResponse = "";
+
       this.updateUserContext({ role: "user", content: text });
-      const model =
-        ActiveCallConfig.getInstance().getCallConfig()?.callModel ||
-        MODELS.GPT_4_TUBRO;
-      console.info(`gpt: model: ${model}`);
+
       const completeion = await this.openaiClient.chat.completions.create({
         messages: this.context,
-        model,
-        response_format: {
-          type: "json_object",
-        },
+        model: MODELS.GPT_4_TUBRO,
         temperature: 0,
         max_tokens: 100,
+        stream: true,
       });
 
-      console.log(completeion.choices[0].message.content);
-      const assistantPrompt = completeion.choices[0].message.content;
+      for await (const chunk of completeion) {
+        const content = chunk.choices[0].delta.content;
+        const finishReason = chunk.choices[0].finish_reason;
 
-      console.log(`gpt: ${JSON.stringify(assistantPrompt)}`);
-      if (!assistantPrompt) {
-        console.info(`gpt: GPT -> invalid assistant prompt`);
-      } else {
-        const assistantResponse = JSON.parse(
-          assistantPrompt
-        ) as AssistantResponse;
+        if (content) {
+          console.log(colorInfo(`gpt: ${content}`));
+          completeResponse += content;
+          partialResponse += content;
+        }
 
-        this.emit("gptreply", assistantResponse);
-        this.updateUserContext({
-          role: "assistant",
-          content: assistantResponse.content,
-        });
-        console.log(`gpt: GPT -> user context length: ${this.context.length}`);
+        if (finishReason === "stop") {
+          if (partialResponse.length > 0) {
+            const assistantResponse: AssistantResponse = {
+              responseType: ResponseType.SAY_FOR_VOICE,
+              content: partialResponse,
+            };
+            console.log(`gpt: ${JSON.stringify(assistantResponse)}`);
+            this.emit(
+              "gptreply",
+              assistantResponse,
+              this.partialResponseIndex,
+              interactionCount
+            );
+            this.partialResponseIndex++;
+            partialResponse = "";
+          } else {
+            console.info(colorWarn(`gpt: GPT -> empty assistant prompt`));
+          }
+        }
       }
+
+      this.updateUserContext({
+        role: "assistant",
+        content: completeResponse,
+      });
+      console.log(`gpt: GPT -> user context length: ${this.context.length}`);
     } catch (err) {
       console.log("gpt: error recieved");
       console.error(err);
