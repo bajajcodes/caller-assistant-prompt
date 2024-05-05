@@ -26,7 +26,7 @@ interface SendDigitsResponse extends BaseResponse {
 
 export interface EndCallResponse extends BaseResponse {
   responseType: ResponseType.END_CALL;
-  applicationStatus: string; // Only in this type
+  applicationStatus?: string; // Only in this type
 }
 
 export type AssistantResponse =

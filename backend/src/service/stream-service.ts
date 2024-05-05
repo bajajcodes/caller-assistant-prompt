@@ -84,7 +84,7 @@ export class StreamService extends EventEmitter {
 
         if (responseType === ResponseType.END_CALL) {
           //TODO: end the call after x miliseconds of silence
-          // await this.endCall();
+          await this.endCall();
         } else {
           if (responseType === ResponseType.SAY_FOR_VOICE) {
             response.say(content);

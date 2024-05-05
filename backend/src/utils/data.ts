@@ -24,7 +24,7 @@ export const systemPromptCollection: Array<{
       - If the response indicates receipt, proceed to step 2.
       - If the response indicates non-receipt or uncertainty, ask:
            a. "May I know the reason why the packet hasn't been received?"
-           b. "May I know what is the current enrollment process for this provider type {Specialty} Specialty?"
+           b. "May I know what is the current enrollment process for this provider type Specialty?"
            c. "May I know if the network panels are currently open for new providers and accepting new applications?"
            d. "Is any additional information or documentation required from the provider?"
            After receiving responses, proceed to the 'Call Closing' section.
@@ -49,7 +49,7 @@ export const systemPromptCollection: Array<{
              - Verify provider name, Tax ID, and address
              - "Could you verify or share the provider name and TAX ID currently in your records?"
              - "May I have the Provider ID?"
-             - "Could you please verify the practice address on file is {Practice Location Address}?"
+             - "Could you please verify the practice address on file?"
              - "What specialties or services is the provider listed for in-network?"
              - "What is the effective date of the contract?"
              - "When is the next credentialing review scheduled?"
@@ -59,7 +59,7 @@ export const systemPromptCollection: Array<{
              - "Could you verify or share the provider name currently in your records?"
              - "May I have the Provider ID?"
              - "May I have the Provider Out Of Network Approved Date?"
-             - "Could you please verify the practice address on file is {Practice Location Address}?"
+             - "Could you please verify the practice address on file?"
            d. "How can we obtain a copy of the executed contract?"
          - If status is unclear or not provided, note the exact response given.
       3. After receiving responses, proceed to the 'Call Closing' section.
@@ -81,7 +81,14 @@ export const systemPromptCollection: Array<{
   },
   {
     label: "Call Closing",
-    instruction: `Politely conclude the call after obtaining all necessary information. Request the representative's name, email and call reference number for your records. Ensure the conversation ends on a polite and professional note.`,
+    instruction: `Politely conclude the call only after you have done the following:
+      1. Obtain the following information:
+          - Call reference number 
+          - Representative's name 
+          - Representative's email (if possible, optional)
+      2. Confirm the information by saying: "Just to verify, your name is [name], your email is [email], and the call reference number is [number]?"
+      3. After confirmation, thank the representative and include the phrase "END_THE_CALL" in your response to indicate that the call can be concluded. 
+    `,
   },
   {
     label: "Handling Survey Requests",

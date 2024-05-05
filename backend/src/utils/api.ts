@@ -9,6 +9,8 @@ export interface CallData {
   providerData: ProviderData;
 }
 
+export const PROVIDER_DATA_KEY_REGEX = /\{(.*?)\}/g;
+
 function isValidCallData(data: Partial<CallData>): {
   isValid: boolean;
   message: string;
@@ -41,13 +43,13 @@ function isValidCallData(data: Partial<CallData>): {
 function updateIVRMenus(data: CallData): Array<IVRMenu> {
   return data.ivrMenu.map((ivrMenu) => {
     const updatedResponse = ivrMenu.response.replace(
-      /\{(.*?)\}/g,
+      PROVIDER_DATA_KEY_REGEX,
       (match, key) => {
         return data.providerData[key] || match;
       }
     );
     const updateTriggers = ivrMenu.triggers.map((trigger) => {
-      return trigger.replace(/\{(.*?)\}/g, (match, key) => {
+      return trigger.replace(PROVIDER_DATA_KEY_REGEX, (match, key) => {
         return data.providerData[key] || match;
       });
     });

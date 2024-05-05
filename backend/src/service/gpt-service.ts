@@ -5,6 +5,7 @@ import { AssistantResponse, MODELS, ResponseType } from "types/openai";
 import { colorInfo, colorWarn } from "utils/colorCli";
 import { OPEN_AI_KEY } from "utils/config";
 import { systemPromptCollection } from "utils/data";
+import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
 
 type Message = {
@@ -75,8 +76,10 @@ export class GPTService extends EventEmitter {
         if (finishReason === "stop") {
           if (partialResponse.length > 0) {
             const assistantResponse: AssistantResponse = {
-              responseType: ResponseType.SAY_FOR_VOICE,
               content: partialResponse,
+              responseType: partialResponse.includes("END_THE_CALL")
+                ? ResponseType.END_CALL
+                : ResponseType.SAY_FOR_VOICE,
             };
             console.log(`gpt: ${JSON.stringify(assistantResponse)}`);
             this.emit(
@@ -116,12 +119,9 @@ export class GPTService extends EventEmitter {
     Array<Message>
     // eslint-disable-next-line indent
   > {
-    const providerDataStringified = await redisClient.get(
-      `${this.callSid}__providerdata`
-    );
-    const providerData = providerDataStringified
-      ? JSON.parse(providerDataStringified)
-      : {};
+    //TODO: throw error if providerData is undefined
+    const providerData =
+      ActiveCallConfig.getInstance().getCallConfig()?.providerData || {};
     const transcription = await this.initializeTranscription();
     if (transcription.length === 0) {
       // If transcription doesn't exist, initialize it with the system role message
