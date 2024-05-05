@@ -4,7 +4,7 @@ import { colorInfo, colorSuccess, colorWarn } from "utils/colorCli";
 import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
 
-interface IVRMenu {
+export interface IVRMenu {
   intent: string;
   triggers: string[];
   response: string;

@@ -1,10 +1,10 @@
-import { MODELS } from "types/openai";
 import { colorWarn } from "utils/colorCli";
+import { IVRMenu } from "./ivr-service";
 
 interface CallConfig {
   callSid: string;
-  callModel: MODELS;
-  callEndpointing: number;
+  ivrMenu: Array<IVRMenu>;
+  providerData: Record<string, string>;
   isIVRNavigationCompleted: boolean;
   isLastIvrMenuOptionUsed: boolean;
 }
@@ -12,11 +12,9 @@ interface CallConfig {
 export class ActiveCallConfig {
   private static instance: ActiveCallConfig;
   private callConfig: CallConfig | null;
-  private timer: NodeJS.Timeout | null;
 
   private constructor() {
     this.callConfig = null;
-    this.timer = null;
   }
 
   public static getInstance(): ActiveCallConfig {
@@ -26,28 +24,23 @@ export class ActiveCallConfig {
     return ActiveCallConfig.instance;
   }
 
-  public setCallConfig(
-    callSid: string,
-    callModel: MODELS,
-    callEndpointing: number
-  ): void {
+  public setCallConfig({
+    callSid,
+    ivrMenu,
+    providerData,
+  }: {
+    callSid: string;
+    ivrMenu: Array<IVRMenu>;
+    providerData: Record<string, string>;
+  }): void {
+    this.deleteCallConfig();
     this.callConfig = {
       callSid,
-      callModel,
-      callEndpointing,
+      ivrMenu,
+      providerData,
       isIVRNavigationCompleted: false,
       isLastIvrMenuOptionUsed: false,
     };
-
-    // Clear any existing timer
-    if (this.timer) {
-      clearTimeout(this.timer);
-    }
-
-    // Set a new timer to reset the call configuration after 1 minute and 30 seconds
-    // this.timer = setTimeout(() => {
-    //   this.resetCallConfig();
-    // }, 90000); // 1 minute and 30 seconds = 90000 milliseconds
   }
 
   public setIVRNavigationCompleted() {
@@ -61,32 +54,21 @@ export class ActiveCallConfig {
     this.callConfig.isLastIvrMenuOptionUsed = true;
   }
 
-  public setEndpointing(endpointing: number) {
-    if (!this.callConfig) return;
-    this.callConfig.callEndpointing = endpointing;
-  }
-
   public getCallConfig() {
     return this.callConfig;
   }
 
   public deleteCallConfig(): void {
     this.callConfig = null;
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
   }
 
-  private resetCallConfig(): void {
+  public resetCallConfig(): void {
     if (this.callConfig) {
       console.log(
         `Resetting call configuration for call ${this.callConfig.callSid}`
       );
       this.callConfig = {
         ...this.callConfig,
-        callModel: MODELS.GPT_4_TUBRO,
-        callEndpointing: 100,
         isIVRNavigationCompleted: this.callConfig.isIVRNavigationCompleted,
       };
     }

@@ -23,26 +23,12 @@ const startServer = async () => {
 
       console.info("socket: new client connected.");
 
+      const ivrMenu = ActiveCallConfig.getInstance().getCallConfig()?.ivrMenu;
       const streamService = new StreamService(ws);
       const transcriptionService = new TranscriptionService();
       const gptService = new GPTService();
-      const ivrService = new IVRService([
-        {
-          intent: "Reason for your Call",
-          response: "credentialing",
-          triggers: ["reason for your call"],
-        },
-        {
-          intent: "Confirm Reason for Call",
-          response: "credentialing",
-          triggers: ["calling about credentialing"],
-        },
-        {
-          intent: "Calling For",
-          response: "credentialing",
-          triggers: ["say credentialing"],
-        },
-      ]);
+      //TODO: throw error if ivrMenu is undefined
+      const ivrService = new IVRService(ivrMenu || []);
       // let marks = [];
       let interactionCount = 0;
 

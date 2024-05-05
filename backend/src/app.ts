@@ -6,9 +6,10 @@ import { makeOutboundCall } from "scripts/outbound-call";
 import { ActiveCallConfig } from "service/activecall-service";
 import { redisClient } from "service/redis";
 import { Message } from "types/call";
-import { MODELS } from "types/openai";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { STORE_KEYS } from "types/redis";
+import { CallData, isValidCallData, updateIVRMenus } from "utils/api";
+import { colorErr } from "utils/colorCli";
 
 const app: Express = express();
 
@@ -72,32 +73,34 @@ app.get("/calllog/:callsid", async (req, res) => {
 app.post("/makeoutboundcall", async (req, res) => {
   try {
     console.log(req.body);
-    const call = await makeOutboundCall(req.body.phoneNumber as string);
-
-    if (call?.sid) {
-      await redisClient.set(
-        `${call.sid}__providerdata`,
-        JSON.stringify(req.body)
-      );
-      ActiveCallConfig.getInstance().setCallConfig(
-        call.sid,
-        MODELS.GPT_4_TUBRO,
-        1000
-      );
-      res.json({
-        message: `Call initiated`,
-        callSid: call.sid,
-      });
-    } else {
-      res.status(400).json({
-        message: "Failed to initiate the call.",
-        callSid: null,
-      });
+    const callData = req.body as CallData;
+    const { isValid, message } = isValidCallData(callData);
+    if (!isValid) {
+      return res.status(400).json({ message, callSid: null });
     }
+    const call = await makeOutboundCall(callData.providerData.phoneNumber);
+
+    if (!call.sid) {
+      return res
+        .status(400)
+        .json({ message: "Failed to initiate the call.", callSid: null });
+    }
+    callData.ivrMenu = updateIVRMenus(callData);
+
+    ActiveCallConfig.getInstance().setCallConfig({
+      callSid: call.sid,
+      ivrMenu: callData.ivrMenu,
+      providerData: callData.providerData,
+    });
+    res.json({
+      message: `Call initiated`,
+      callSid: call.sid,
+      updatedIvrMenu: callData.ivrMenu,
+    });
   } catch (err: unknown) {
-    console.error(err);
+    console.error(colorErr(err));
     res.status(400).json({
-      message: `twilio: ${(err as Error)?.message || "failed to initiate call"}.`,
+      message: `${(err as Error)?.message || "failed to initiate call"}.`,
       callSid: null,
     });
   }
