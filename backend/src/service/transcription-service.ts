@@ -6,6 +6,7 @@ import {
   createClient,
 } from "@deepgram/sdk";
 import EventEmitter from "events";
+import { isCallTransfered } from "scripts/iscall-transfered";
 import { $TSFixMe } from "types/common";
 import {
   colorErr,
@@ -95,6 +96,17 @@ export class TranscriptionService extends EventEmitter {
           } else {
             console.log(colorWarn("utterance", text));
             this.emit("utterance", text);
+            if (
+              ActiveCallConfig.getInstance().getCallConfig()
+                ?.isLastIvrMenuOptionUsed &&
+              !ActiveCallConfig.getInstance().getCallConfig()
+                ?.isIVRNavigationCompleted
+            ) {
+              isCallTransfered(text).then((isTransfered) => {
+                if (!isTransfered) return;
+                ActiveCallConfig.getInstance().setIVRNavigationCompleted();
+              });
+            }
           }
         }
       );
