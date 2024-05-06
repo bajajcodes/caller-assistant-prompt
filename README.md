@@ -12,10 +12,10 @@
 - Fill it with the following lines, replacing placeholders with your actual credentials:
 
 ```sh
+HOST={{HOST}}
 TWILIO_ACCOUNT_SID={{TWILIO_ACCOUNT_SID}}
 TWILIO_AUTH_TOKEN={{TWILIO_AUTH_TOKEN}}
 TWILIO_FROM_NUMBER={{TWILIO_FROM_NUMBER}}
-TWILIO_TO_NUMBER={{TWILIO_TO_NUMBER}}
 PORT={{PORT}}
 DEEPGRAM_API_KEY={{DEEPGRAM_API_KEY}}
 TWILIO_API_KEY={{TWILIO_API_KEY}}
@@ -26,18 +26,27 @@ REDIS_CLIENT_URL={{REDIS_CLIENT_URL}}
 
 **2. Install Dependencies:**
 
-- Open your terminal and navigate to your project's root directory.
+- Open your terminal and navigate to your project's `backend` directory.
 - Run `npm install` to install all dependencies.
 
 **3. Running a Redis Server Locally with Docker (for development only):**
 This step is optional but recommended for local development. It allows you to run a Redis server within a Docker container.
 
-- Open your terminal and navigate to your project's root directory.
+- Open your terminal.
+- Install Docker.
+- Pull latest Redis image.
+
+```sh
+docker pull redis
+```
+
 - Run the following command to start a Redis container in the background:
 
 ```sh
-docker run --name myredis -d redis
+ docker run --name {{redis-name}} -p 6379:6379 -d redis
 ```
+
+Replace {{redis-name}} with name of your choice.
 
 - Verify if the Redis container is running:
 
@@ -50,10 +59,14 @@ This should list your running containers, including the myredis container you ju
 - Connect to the Redis Container
 
 ```sh
-docker exec -it <container_id> sh
+docker exec -it {{redis-name}} sh
 ```
 
-- Testing Redis container
+- Type `redis-cli` into terminal for testing Redis container, then type `ping` to test redis container.
+
+```sh
+redis-cli
+```
 
 ```sh
 127.0.0.1:6379>ping
@@ -74,3 +87,72 @@ REDIS_CLIENT_URL=redis://localhost:6379
 - This will start the project and automatically reload any changes you make.
 
 **That's it!** Your project should now be running, typically on port 3000 (check your terminal output for confirmation).
+
+## How to Hit the `/makeoutboundcall` Endpoint
+
+**Before you begin:**
+
+- Make sure you have Postman or Other Similar appication installed for making outbound calls.
+
+**1. API Endpoint**
+
+```sh
+HOST/makeoutboundcall
+```
+
+> Replace ‘HOST’ with the actual domain name hosting the API.
+
+**2. Method**
+
+This endpoint accept a POST request since you're initiating an outbound call.
+
+**3. Payload Data**
+
+_Payload Structure_
+
+- **ivrMenu:** An array of objects configuring the IVR (Interactive Voice Response) menu.
+  - _intent:_ Represents the expected caller's purpose for the call.
+  - _response:_ (Likely) what the IVR system should reply with.
+  - _triggers:_ Words or phrases that would match this intent.
+- **providerData:** An object containing detailed information about the healthcare provider associated with the call. The Payer number key is expected to be named as `phoneNumber`.
+
+_Example Payload Data:_
+
+```json
+{
+  "ivrMenu": [
+    {
+      "intent": "Reason for your Call",
+      "response": "credentialing",
+      "triggers": ["reason for your call"]
+    },
+    {
+      "intent": "Confirm Reason for Call",
+      "response": "credentialing",
+      "triggers": ["calling about credentialing"]
+    },
+    {
+      "intent": "Calling For",
+      "response": "credentialing",
+      "triggers": ["say credentialing"]
+    }
+  ],
+  "providerData": {
+    "ticketId": 170958,
+    "ticketName": "Application Follow-up",
+    "taskType": "Application followup by Phone",
+    "payerName": "United Healthcare Insurance Company (Washington)",
+    "providerNpi": "1033400346",
+    "providerName": "JILL BISHOP",
+    "taxId": "933437607",
+    "serviceState": "WA",
+    "speciality": "Mental Health Counselor",
+    "locationAddress": "1610 Scott Place  Bremerton WA 98310",
+    "specialityType": "Behavioral Health Providers",
+    "phoneNumber": "8776140484",
+    "callbackNumber": "8264551832",
+    "applicationSubmitionDate": "04/19/2024 12:00:00 AM EST",
+    "applicationTrackingNumber": ""
+  }
+}
+```
