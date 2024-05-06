@@ -6,6 +6,8 @@
 
 - Make sure you have Node.js installed. Check by running `node -v` in your terminal. Download it from [https://nodejs.org/en](https://nodejs.org/en) if needed.
 
+- Switch to `feat/dashboard` Branch.
+
 **1. Environment Variables:**
 
 - Create a file named `.env` in your project's root directory.
@@ -122,19 +124,34 @@ _Example Payload Data:_
 {
   "ivrMenu": [
     {
-      "intent": "Reason for your Call",
-      "response": "credentialing",
-      "triggers": ["reason for your call"]
+      "intent": "Provider Type",
+      "triggers": ["health care provider"],
+      "response": "health care provider"
     },
     {
-      "intent": "Confirm Reason for Call",
-      "response": "credentialing",
-      "triggers": ["calling about credentialing"]
+      "intent": "Enter NPI",
+      "response": "{providerNpi}",
+      "triggers": ["providers npi"]
     },
     {
-      "intent": "Calling For",
-      "response": "credentialing",
-      "triggers": ["say credentialing"]
+      "intent": "Verify NPI",
+      "response": "1",
+      "triggers": ["{providerNpi} correct"]
+    },
+    {
+      "intent": "Calling From",
+      "triggers": ["behavioral health"],
+      "response": "3"
+    },
+    {
+      "intent": "Calling About",
+      "response": "2",
+      "triggers": ["eligibility"]
+    },
+    {
+      "intent": "Sepciality",
+      "response": "{providerSpecialty}",
+      "triggers": ["sepciality type"]
     }
   ],
   "providerData": {
