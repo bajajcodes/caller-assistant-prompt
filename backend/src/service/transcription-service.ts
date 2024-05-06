@@ -7,7 +7,13 @@ import {
 } from "@deepgram/sdk";
 import EventEmitter from "events";
 import { $TSFixMe } from "types/common";
-import { colorErr, colorInfo, colorSuccess, colorWarn } from "utils/colorCli";
+import {
+  colorErr,
+  colorInfo,
+  colorSuccess,
+  colorUpdate,
+  colorWarn,
+} from "utils/colorCli";
 import { DEEPGRAM_API_KEY } from "utils/config";
 import { ActiveCallConfig } from "./activecall-service";
 
@@ -40,8 +46,13 @@ export class TranscriptionService extends EventEmitter {
         ? 1500
         : 1000,
     };
+    console.log(
+      colorUpdate(
+        `endpointing:${transcriptionOptions.endpointing} 
+        utterance_end_ms:${transcriptionOptions.utterance_end_ms}`
+      )
+    );
     this.deepgramLive = deepgram.listen.live(transcriptionOptions);
-
     this.finalResult = "";
     this.audioBuffer = [];
     this.retryAttempts = 0;

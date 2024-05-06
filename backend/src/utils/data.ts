@@ -17,54 +17,10 @@ export const systemPromptCollection: Array<{
     instruction:
       "When asking any question from the 'Application Status Query' section, evaluate the representative's response to determine if it qualifies as a valid answer or is similar to the expected answer. Assert on the user input and use natural language processing techniques, semantic similarity, and context awareness to assess the relevance and appropriateness of the response. Consider the specific question asked, the expected response pattern, and any relevant synonyms or variations. If the response is deemed valid or similar to the expected answer, proceed to the next relevant question or instructions in the 'Application Status Query' flow. If the response is a clear negative or does not qualify as a valid answer, proceed to the corresponding negative path or section in the 'Application Status Query' flow. If the response is unclear or does not provide a direct answer, proceed to the corresponding negative path or section in the 'Application Status Query' flow. Avoid getting stuck in an infinite loop by moving forward in the conversation when a clear answer cannot be obtained, based on the assert analysis.",
   },
-  {
-    label: "Application Status Query",
-    instruction: `
-      1. Ask: "Has the enrollment application packet been received?"
-      - If the response indicates receipt, proceed to step 2.
-      - If the response indicates non-receipt or uncertainty, ask:
-           a. "May I know the reason why the packet hasn't been received?"
-           b. "May I know what is the current enrollment process for this provider type Specialty?"
-           c. "May I know if the network panels are currently open for new providers and accepting new applications?"
-           d. "Is any additional information or documentation required from the provider?"
-           After receiving responses, proceed to the 'Call Closing' section.
-      2. Ask: "May I know the current status of the enrollment application?"
-         - If the status is identified as "In-Process", "Rejected", or "Approved", proceed with the corresponding status-specific questions:
-         - If "In-Process", ask:
-           a. "When was the application received?"
-           b. "Could you verify the application tracking number?"
-           c. "Is any additional information needed from the provider to process the application?"
-             - If yes, ask: 
-               a. "What specific documents or information are required?"  
-               b. "How many days do we have to provide this information?"
-           d. "How long will it take to process the application?"
-         - If "Rejected", ask:
-           a. "What is the exact reason for the denial?"
-           b. "Was the provider notified of the denial via email or letter?"
-           c. "Could you provide the email address or mailing address where the denial notification was sent?"
-           d. "Is it possible to resubmit the application for this provider?"
-         - If "Approved", ask:
-           a. "Is the provider approved as in-network or out-of-network?"
-           b. If in-network:
-             - Verify provider name, Tax ID, and address
-             - "Could you verify or share the provider name and TAX ID currently in your records?"
-             - "May I have the Provider ID?"
-             - "Could you please verify the practice address on file?"
-             - "What specialties or services is the provider listed for in-network?"
-             - "What is the effective date of the contract?"
-             - "When is the next credentialing review scheduled?"
-           c. If out-of-network:
-             - Verify provider address
-             - "Why was the provider approved as out-of-network?"
-             - "Could you verify or share the provider name currently in your records?"
-             - "May I have the Provider ID?"
-             - "May I have the Provider Out Of Network Approved Date?"
-             - "Could you please verify the practice address on file?"
-           d. "How can we obtain a copy of the executed contract?"
-         - If status is unclear or not provided, note the exact response given.
-      3. After receiving responses, proceed to the 'Call Closing' section.
-    `,
-  },
+  // {
+  //   label: "Application Status Query",
+  //   instruction: "",
+  // },
   {
     label: "Response Guidelines",
     instruction:
@@ -99,3 +55,66 @@ export const systemPromptCollection: Array<{
 export const callTransferAnalyzer = `Role: IVR Transcript Analyzer
 Task: Determine if the transcript includes an indication that the call is being transferred, will be transferred, or has already been transferred.
 Output: Yes or No`;
+
+export const applicationOnFileStatusQuery = `
+1. Ask: "Has the enrollment application packet been received?"
+- If the response indicates receipt, proceed to step 2.
+- If the response indicates non-receipt or uncertainty, ask:
+     a. "May I know the reason why the packet hasn't been received?"
+     b. "May I know what is the current enrollment process for this provider type Specialty?"
+     c. "May I know if the network panels are currently open for new providers and accepting new applications?"
+     d. "Is any additional information or documentation required from the provider?"
+     After receiving responses, proceed to the 'Call Closing' section.
+2. Ask: 
+     a. "May I know the date when the application was received?"
+     b. "Could you verify or share the application tracking number currently in your records?"
+     c. "How much time it will take to process the complete application?"
+     d. "Is there any additional information needed or pending to process the provider application?"
+3. After receiving responses, proceed to the 'Call Closing' section.
+`;
+
+export const applicationFollowUpStatusQuery = `
+1. Ask: "Has the enrollment application packet been received?"
+- If the response indicates receipt, proceed to step 2.
+- If the response indicates non-receipt or uncertainty, ask:
+     a. "May I know the reason why the packet hasn't been received?"
+     b. "May I know what is the current enrollment process for this provider type Specialty?"
+     c. "May I know if the network panels are currently open for new providers and accepting new applications?"
+     d. "Is any additional information or documentation required from the provider?"
+     After receiving responses, proceed to the 'Call Closing' section.
+2. Ask: "May I know the current status of the enrollment application?"
+   - If the status is identified as "In-Process", "Rejected", or "Approved", proceed with the corresponding status-specific questions:
+   - If "In-Process", ask:
+     a. "When was the application received?"
+     b. "Could you verify the application tracking number?"
+     c. "Is any additional information needed from the provider to process the application?"
+       - If yes, ask: 
+         a. "What specific documents or information are required?"  
+         b. "How many days do we have to provide this information?"
+     d. "How long will it take to process the application?"
+   - If "Rejected", ask:
+     a. "What is the exact reason for the denial?"
+     b. "Was the provider notified of the denial via email or letter?"
+     c. "Could you provide the email address or mailing address where the denial notification was sent?"
+     d. "Is it possible to resubmit the application for this provider?"
+   - If "Approved", ask:
+     a. "Is the provider approved as in-network or out-of-network?"
+     b. If in-network:
+       - Verify provider name, Tax ID, and address
+       - "Could you verify or share the provider name and TAX ID currently in your records?"
+       - "May I have the Provider ID?"
+       - "Could you please verify the practice address on file?"
+       - "What specialties or services is the provider listed for in-network?"
+       - "What is the effective date of the contract?"
+       - "When is the next credentialing review scheduled?"
+     c. If out-of-network:
+       - Verify provider address
+       - "Why was the provider approved as out-of-network?"
+       - "Could you verify or share the provider name currently in your records?"
+       - "May I have the Provider ID?"
+       - "May I have the Provider Out Of Network Approved Date?"
+       - "Could you please verify the practice address on file?"
+     d. "How can we obtain a copy of the executed contract?"
+   - If status is unclear or not provided, note the exact response given.
+3. After receiving responses, proceed to the 'Call Closing' section.
+`;

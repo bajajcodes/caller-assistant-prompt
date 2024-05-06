@@ -4,7 +4,10 @@ import { ChatCompletionSystemMessageParam } from "openai/resources/index.mjs";
 import { AssistantResponse, MODELS, ResponseType } from "types/openai";
 import { colorInfo, colorWarn } from "utils/colorCli";
 import { OPEN_AI_KEY } from "utils/config";
-import { systemPromptCollection } from "utils/data";
+import {
+  applicationFollowUpStatusQuery,
+  systemPromptCollection,
+} from "utils/data";
 import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
 
@@ -21,8 +24,13 @@ const getSystemRoleMessage = (
     label: "Data Presentation or Data",
     instruction: providerDataStringified.replaceAll("\t", " "),
   };
+  //TODO: toggle b/w applicaiton followup and application on file with payer status query prompts using property ticketType
+  const applicationStatusQuery = {
+    label: "Application Status Query",
+    instruction: applicationFollowUpStatusQuery,
+  };
   const promptCollection = systemPromptCollection;
-  const prompt = [...promptCollection, data];
+  const prompt = [...promptCollection, data, applicationStatusQuery];
   const content = prompt.reduce(
     (prompt, item) => `${prompt} ${item.label}:${item.instruction} `,
     ""
