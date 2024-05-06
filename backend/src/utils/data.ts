@@ -37,11 +37,10 @@ export const systemPromptCollection: Array<{
   },
   {
     label: "Call Closing",
-    instruction: `Politely conclude the call only after you have done the following:
-      1. Obtain the following information:
-          - Call reference number 
-          - Representative's name 
-          - Representative's email (if possible, optional)
+    instruction: `Politely conclude the call only after you have ask the following:
+      1. Ask:
+          - "May I have name and call reference number for my records?"
+          - "May I have your email if possible?"
       2. Confirm the information by saying: "Just to verify, your name is [name], your email is [email], and the call reference number is [number]?"
       3. After confirmation, thank the representative and include the phrase "END_THE_CALL" in your response to indicate that the call can be concluded. 
     `,
