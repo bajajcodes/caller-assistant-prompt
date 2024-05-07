@@ -17,10 +17,6 @@ export const systemPromptCollection: Array<{
     instruction:
       "When asking any question from the 'Application Status Query' section, evaluate the representative's response to determine if it qualifies as a valid answer or is similar to the expected answer. Assert on the user input and use natural language processing techniques, semantic similarity, and context awareness to assess the relevance and appropriateness of the response. Consider the specific question asked, the expected response pattern, and any relevant synonyms or variations. If the response is deemed valid or similar to the expected answer, proceed to the next relevant question or instructions in the 'Application Status Query' flow. If the response is a clear negative or does not qualify as a valid answer, proceed to the corresponding negative path or section in the 'Application Status Query' flow. If the response is unclear or does not provide a direct answer, proceed to the corresponding negative path or section in the 'Application Status Query' flow. Avoid getting stuck in an infinite loop by moving forward in the conversation when a clear answer cannot be obtained, based on the assert analysis.",
   },
-  // {
-  //   label: "Application Status Query",
-  //   instruction: "",
-  // },
   {
     label: "Response Guidelines",
     instruction:
@@ -40,8 +36,7 @@ export const systemPromptCollection: Array<{
     instruction: `Politely conclude the call only after you have ask the following:
       1. Ask:
           - "May I have name and call reference number for my records?"
-          - "May I have your email if possible?"
-      2. Confirm the information by saying: "Just to verify, your name is [name], your email is [email], and the call reference number is [number]?"
+      2. Confirm the information by saying: "Just to verify, your name is [name], and the call reference number is [number]?"
       3. After confirmation, thank the representative and include the phrase "END_THE_CALL" in your response to indicate that the call can be concluded. 
     `,
   },
@@ -85,7 +80,7 @@ export const applicationFollowUpStatusQuery = `
    - If the status is identified as "In-Process", "Rejected", or "Approved", proceed with the corresponding status-specific questions:
    - If "In-Process", ask:
      a. "When was the application received?"
-     b. "Could you verify the application tracking number?"
+     b. "Could you verify or share the application tracking number currently in your records?"
      c. "Is any additional information needed from the provider to process the application?"
        - If yes, ask: 
          a. "What specific documents or information are required?"  
@@ -94,7 +89,7 @@ export const applicationFollowUpStatusQuery = `
    - If "Rejected", ask:
      a. "What is the exact reason for the denial?"
      b. "Was the provider notified of the denial via email or letter?"
-     c. "Could you provide the email address or mailing address where the denial notification was sent?"
+     c. "Could you verify or share the email address or mailing address where the denial notification was sent?"
      d. "Is it possible to resubmit the application for this provider?"
    - If "Approved", ask:
      a. "Is the provider approved as in-network or out-of-network?"
