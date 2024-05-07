@@ -36,7 +36,7 @@ export const systemPromptCollection: Array<{
     instruction: `Politely conclude the call only after you have ask the following:
       1. Ask:
           - "May I have name and call reference number for my records?"
-      2. Confirm the information by saying: "Just to verify, your name is [name], and the call reference number is [number]?"
+      2. Confirm the information by saying: "Just to verify, your name is , and the call reference number is ?"
       3. After confirmation, thank the representative and include the phrase "END_THE_CALL" in your response to indicate that the call can be concluded. 
     `,
   },
@@ -95,7 +95,8 @@ export const applicationFollowUpStatusQuery = `
      a. "Is the provider approved as in-network or out-of-network?"
      b. If in-network:
        - Verify provider name, Tax ID, and address
-       - "Could you verify or share the provider name and TAX ID currently in your records?"
+       - "Could you verify or share the provider name currently in your records?"
+       - "Could you verify or share the provider TAX ID currently in your records?"
        - "May I have the Provider ID?"
        - "Could you please verify the practice address on file?"
        - "What specialties or services is the provider listed for in-network?"
