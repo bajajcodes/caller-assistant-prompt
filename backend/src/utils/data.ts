@@ -37,7 +37,7 @@ export const systemPromptCollection: Array<{
       1. Ask:
           - "May I have name and call reference number for my records?"
       2. Confirm the information by saying: "Just to verify, your name is , and the call reference number is ?"
-      3. After confirmation, thank the representative and include the phrase "END_THE_CALL" in your response to indicate that the call can be concluded. 
+      3. After confirmation, ask the representative: "Am I allowed to drop the call now?" If the representative response indicates yes thank the representative and conclude the call. If the representative response indicates anything other than "yes" repeat step 3 until you receive a response indicates "yes". Once you receive a response indicates "yes", thank the representative and include the phrase "END_THE_CALL" in your response to indicate that the call can be concluded.
     `,
   },
   {
