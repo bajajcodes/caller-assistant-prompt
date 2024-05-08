@@ -2,7 +2,7 @@ import EventEmitter from "events";
 import OpenAI from "openai";
 import { ChatCompletionSystemMessageParam } from "openai/resources/index.mjs";
 import { AssistantResponse, MODELS, ResponseType } from "types/openai";
-import { colorInfo, colorWarn } from "utils/colorCli";
+import { colorErr, colorInfo, colorWarn } from "utils/colorCli";
 import { OPEN_AI_KEY } from "utils/config";
 import {
   applicationFollowUpStatusQuery,
@@ -83,11 +83,14 @@ export class GPTService extends EventEmitter {
 
         if (finishReason === "stop") {
           if (partialResponse.length > 0) {
+            let responseType = ResponseType.SAY_FOR_VOICE;
+            if (partialResponse.includes("END_THE_CALL")) {
+              partialResponse = partialResponse.replace("END_THE_CALL", "");
+              responseType = ResponseType.END_CALL;
+            }
             const assistantResponse: AssistantResponse = {
               content: partialResponse,
-              responseType: partialResponse.includes("END_THE_CALL")
-                ? ResponseType.END_CALL
-                : ResponseType.SAY_FOR_VOICE,
+              responseType,
             };
             console.log(`gpt: ${JSON.stringify(assistantResponse)}`);
             this.emit(
@@ -110,8 +113,7 @@ export class GPTService extends EventEmitter {
       });
       console.log(`gpt: GPT -> user context length: ${this.context.length}`);
     } catch (err) {
-      console.log("gpt: error recieved");
-      console.error(err);
+      console.log(colorErr("gpt: error recieved"));
       this.emit("gpterror", err);
     }
   }
