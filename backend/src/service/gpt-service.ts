@@ -106,7 +106,9 @@ export class GPTService extends EventEmitter {
           }
         }
       }
-
+      if (completeResponse.includes("END_THE_CALL")) {
+        completeResponse = completeResponse.replace("END_THE_CALL", "");
+      }
       this.updateUserContext({
         role: "assistant",
         content: completeResponse,

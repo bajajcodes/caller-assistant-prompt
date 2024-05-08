@@ -72,9 +72,13 @@ app.get("/calllog/:callsid", async (req, res) => {
 
 app.post("/makeoutboundcall", async (req, res) => {
   try {
-    console.log(req.body);
-    const providerDataString = req.body.providerData;
-    const ivrMenuString = req.body.ivrMenu;
+    //TODO: find solution for for newlines and ' characters formatting
+    const providerDataString = (req.body.providerData as string)
+      .replaceAll("\n", "")
+      .replaceAll("\n'", "");
+    const ivrMenuString = (req.body.ivrMenu as string)
+      .replaceAll("\n", "")
+      .replaceAll("\n'", "");
     const plainProviderData = JSON.parse(providerDataString);
     const plainIvrMenu = JSON.parse(ivrMenuString);
     const callData = {
