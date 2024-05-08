@@ -42,16 +42,17 @@ function isValidCallData(data: Partial<CallData>): {
 
 function updateIVRMenus(data: CallData): Array<IVRMenu> {
   return data.ivrMenu.map((ivrMenu) => {
-    const updatedResponse = ivrMenu.response.replace(
-      PROVIDER_DATA_KEY_REGEX,
-      (match, key) => {
+    const updatedResponse = ivrMenu.response
+      .replace(PROVIDER_DATA_KEY_REGEX, (match, key) => {
         return data.providerData[key] || match;
-      }
-    );
+      })
+      .toLowerCase();
     const updateTriggers = ivrMenu.triggers.map((trigger) => {
-      return trigger.replace(PROVIDER_DATA_KEY_REGEX, (match, key) => {
-        return data.providerData[key] || match;
-      });
+      return trigger
+        .replace(PROVIDER_DATA_KEY_REGEX, (match, key) => {
+          return data.providerData[key] || match;
+        })
+        .toLowerCase();
     });
     return {
       ...ivrMenu,
