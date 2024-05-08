@@ -73,7 +73,14 @@ app.get("/calllog/:callsid", async (req, res) => {
 app.post("/makeoutboundcall", async (req, res) => {
   try {
     console.log(req.body);
-    const callData = req.body as CallData;
+    const providerDataString = req.body.providerData;
+    const ivrMenuString = req.body.ivrMenu;
+    const plainProviderData = JSON.parse(providerDataString);
+    const plainIvrMenu = JSON.parse(ivrMenuString);
+    const callData = {
+      providerData: plainProviderData,
+      ivrMenu: plainIvrMenu,
+    } as CallData;
     const { isValid, message } = isValidCallData(callData);
     if (!isValid) {
       return res.status(400).json({ message, callSid: null });
