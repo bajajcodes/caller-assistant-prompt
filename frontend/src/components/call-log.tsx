@@ -38,13 +38,10 @@ export const CallLog = () => {
     error,
     trigger: transcriptionFetcher,
     isMutating,
-  } = useSWRMutation(
-    "https://caller-assistant-prompt.onrender.com/calllog",
-    callTranscriptionFetcher
-  );
+  } = useSWRMutation("/calllog", callTranscriptionFetcher);
 
   const { trigger: hangupCall } = useSWRMutation(
-    `https://caller-assistant-prompt.onrender.com/hangupcall`,
+    `/hangupcall`,
     hangupCallFetcher,
     {
       onSuccess: (done) => {
