@@ -46,13 +46,17 @@ function updateIVRMenus(data: CallData): Array<IVRMenu> {
       .replace(PROVIDER_DATA_KEY_REGEX, (match, key) => {
         return data.providerData[key] || match;
       })
-      .toLowerCase();
+      .toLowerCase()
+      .replaceAll(/\s/g, "")
+      .replaceAll(/[^a-zA-Z0-9\s]/g, "");
     const updateTriggers = ivrMenu.triggers.map((trigger) => {
       return trigger
         .replace(PROVIDER_DATA_KEY_REGEX, (match, key) => {
           return data.providerData[key] || match;
         })
-        .toLowerCase();
+        .toLowerCase()
+        .replaceAll(/\s/g, "")
+        .replaceAll(/[^a-zA-Z0-9\s]/g, "");
     });
     return {
       ...ivrMenu,

@@ -34,7 +34,8 @@ export class IVRService extends EventEmitter {
     const transcriptFormatted = transcript
       .toLowerCase()
       .replace(/[^a-zA-Z0-9\s]/g, "")
-      .replace(/(\d)\s+(\d)/g, "$1$2");
+      .replace(/(\d)\s+(\d)/g, "$1$2")
+      .replaceAll(/\s/g, "");
 
     console.info(colorInfo(`ivrservice: ${transcriptFormatted}`));
     const match = this.ivrMenu.find((menu) =>
