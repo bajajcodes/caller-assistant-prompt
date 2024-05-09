@@ -96,8 +96,8 @@ app.post("/makeoutboundcall", async (req, res) => {
         .status(400)
         .json({ message: "Failed to initiate the call.", callSid: null });
     }
-    callData.ivrMenu = updateIVRMenus(callData);
-
+    const { transformedIvrMenu, updatedIvrMenu } = updateIVRMenus(callData);
+    callData.ivrMenu = updatedIvrMenu;
     ActiveCallConfig.getInstance().setCallConfig({
       callSid: call.sid,
       ivrMenu: callData.ivrMenu,
@@ -106,7 +106,7 @@ app.post("/makeoutboundcall", async (req, res) => {
     res.json({
       message: `Call initiated`,
       callSid: call.sid,
-      updatedIvrMenu: callData.ivrMenu,
+      updatedIvrMenu: transformedIvrMenu,
     });
   } catch (err: unknown) {
     console.error(colorErr(err));

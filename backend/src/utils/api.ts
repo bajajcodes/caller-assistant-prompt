@@ -40,30 +40,43 @@ function isValidCallData(data: Partial<CallData>): {
   return { isValid: true, message: "" };
 }
 
-function updateIVRMenus(data: CallData): Array<IVRMenu> {
-  return data.ivrMenu.map((ivrMenu) => {
-    const updatedResponse = ivrMenu.response
+function updateIVRMenus(data: CallData) {
+  const transformedIvrMenu = data.ivrMenu.map((ivrMenu) => {
+    const outputResponse = ivrMenu.response
       .replace(PROVIDER_DATA_KEY_REGEX, (match, key) => {
         return data.providerData[key] || match;
       })
       .toLowerCase()
-      .replaceAll(/\s/g, "")
       .replaceAll(/[^a-zA-Z0-9\s]/g, "");
-    const updateTriggers = ivrMenu.triggers.map((trigger) => {
+    const outputTriggers = ivrMenu.triggers.map((trigger) => {
       return trigger
         .replace(PROVIDER_DATA_KEY_REGEX, (match, key) => {
           return data.providerData[key] || match;
         })
         .toLowerCase()
-        .replaceAll(/\s/g, "")
         .replaceAll(/[^a-zA-Z0-9\s]/g, "");
     });
     return {
       ...ivrMenu,
-      response: updatedResponse,
-      triggers: updateTriggers,
+      response: outputResponse,
+      triggers: outputTriggers,
     };
   });
+  const updatedIvrMenu = transformedIvrMenu.map((ivrMenu) => {
+    const updatedResponse = ivrMenu.response.replaceAll(/\s/g, "");
+    const updatedTriggers = ivrMenu.triggers.map((trigger) => {
+      return trigger.replaceAll(/\s/g, "");
+    });
+    return {
+      ...ivrMenu,
+      response: updatedResponse,
+      triggers: updatedTriggers,
+    };
+  });
+  return {
+    updatedIvrMenu,
+    transformedIvrMenu,
+  };
 }
 
 export { isValidCallData, updateIVRMenus };
