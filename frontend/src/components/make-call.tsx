@@ -77,7 +77,23 @@ export const MakeCallForm = () => {
             <Textarea
               className="min-h-[220px] md:min-h-[420px] w-full resize-none"
               name="providerData"
-              placeholder="Enter provider data"
+              placeholder='{
+  "ticketId": 153996,
+  "ticketName": "Application Follow-up",
+  "taskType": "Application followup by Phone",
+  "payerName": "United Healthcare Insurance",
+  "providerNpi": 1730382599,
+  "providerName": "MARIA LOURDES",
+  "taxId": "880673798",
+  "serviceState": "MD",
+  "speciality": "Psychiatry Physician",
+  "locationAddress": "1511 17th St NW suite 3 20036",
+  "specialityType": "Behavioral Health Providers",
+  "phoneNumber": "8776140484",
+  "applicationSubmitionDate": "01/30/2024T",
+  "applicationTrackingNumber": "",
+  "callbackNumber": "8264549832"
+}'
               required
               aria-required
             />
@@ -90,7 +106,18 @@ export const MakeCallForm = () => {
             <Textarea
               className="min-h-[220px] md:min-h-[420px] w-full resize-none"
               name="ivrMenu"
-              placeholder="Enter IVR menu"
+              placeholder='[
+  {
+    "intent": "Reason for your Call",   
+    "response": "dental provider",  
+    "triggers": ["dental provider"]
+  }, 
+  {
+    "intent": "Confirm Reason for Call",
+    "response": "credentialing",
+    "triggers": ["credentialing"]
+  }
+]'
               required
               aria-required
             />
