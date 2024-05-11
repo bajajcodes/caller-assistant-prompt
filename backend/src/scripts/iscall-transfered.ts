@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { MODELS } from "types/openai";
 import { colorErr, colorInfo } from "utils/colorCli";
 import { OPEN_AI_KEY } from "utils/config";
-import { callTransferAnalyzer } from "utils/data";
+import { callTransferAnalyzer } from "utils/prompts";
 
 export const isCallTransfered = async (userInput: string) => {
   try {

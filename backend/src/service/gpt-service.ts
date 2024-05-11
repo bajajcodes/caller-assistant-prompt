@@ -7,7 +7,7 @@ import { OPEN_AI_KEY } from "utils/config";
 import {
   applicationFollowUpStatusQuery,
   systemPromptCollection,
-} from "utils/data";
+} from "utils/prompts";
 import { ActiveCallConfig } from "./activecall-service";
 import { redisClient } from "./redis";
 
