@@ -1,6 +1,7 @@
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
+import { generateApplicationStatusJson } from "scripts/applicationstatus";
 import { hangupCall } from "scripts/hangup-call";
 import { makeOutboundCall } from "scripts/outbound-call";
 import { ActiveCallConfig } from "service/activecall-service";
@@ -68,6 +69,15 @@ app.get("/calllog/:callsid", async (req, res) => {
     transcription,
     ivrTranscription,
   });
+});
+
+app.get("/applicationstatusjson/:callsid", async (req, res) => {
+  const sid = req.params.callsid;
+  const applicationStatus = await generateApplicationStatusJson(sid);
+  if (!applicationStatus) {
+    return res.status(400).json({ message: "Unable to find Transcription." });
+  }
+  return res.json(applicationStatus);
 });
 
 app.post("/makeoutboundcall", async (req, res) => {
