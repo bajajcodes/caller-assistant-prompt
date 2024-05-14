@@ -2,7 +2,7 @@ import { redisClient } from "./redis";
 
 export enum CallLogKeys {
   SID = "sid",
-  CALL_STATUS = "callStatus",
+  CALL_STATUS = "callstatus",
   TRANSCRIPTION = "transcription",
   IVR_TRANSCRIPTION = "ivr--transcription",
   UPDATED_AT = "updatedAt",
@@ -25,57 +25,65 @@ const CallLogService = (function () {
   async function create(
     sid: string,
     keyType: CallLogKeys,
-    value: string | Record<string, string>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    value: string | Record<string, any>
   ): Promise<void> {
-    const key = `call_${sid}_${keyType}`;
+    const key = `${sid}__${keyType}`;
     const updatedAt = Date.now();
 
-    if (typeof value === "string") {
-      await Promise.all([
-        redisClient.set(key, value),
-        redisClient.expire(key, EXPIRATION_SECONDS),
-      ]);
-    } else {
+    if (
+      keyType === CallLogKeys.IVR_TRANSCRIPTION ||
+      keyType === CallLogKeys.TRANSCRIPTION
+    ) {
       const serializedValue = JSON.stringify(value);
       await Promise.all([
         redisClient.rPush(key, serializedValue),
         redisClient.expire(key, EXPIRATION_SECONDS),
       ]);
+    } else {
+      const valueString =
+        typeof value === "string" ? value : JSON.stringify(value);
+      await Promise.all([
+        redisClient.set(key, valueString),
+        redisClient.expire(key, EXPIRATION_SECONDS),
+      ]);
     }
 
     await Promise.all([
-      redisClient.set(`call_${sid}_updatedAt`, updatedAt.toString()),
-      redisClient.expire(`call_${sid}_updatedAt`, EXPIRATION_SECONDS),
+      redisClient.set(`${sid}__updatedAt`, updatedAt.toString()),
+      redisClient.expire(`${sid}__updatedAt`, EXPIRATION_SECONDS),
     ]);
   }
 
   async function read(sid: string): Promise<CallLog | null> {
     const [
-      callStatus,
+      callstatus,
       updatedAt,
       applicationStatusJson,
       interactionTranscription,
       ivrTranscription,
     ] = await Promise.all([
-      redisClient.get(`call_${sid}_${CallLogKeys.CALL_STATUS}`),
-      redisClient.get(`call_${sid}_${CallLogKeys.UPDATED_AT}`),
-      redisClient.get(`call_${sid}_${CallLogKeys.APPLICATION_STATUS}`),
-      redisClient.lRange(`call_${sid}_${CallLogKeys.TRANSCRIPTION}`, 0, -1),
-      redisClient.lRange(`call_${sid}_${CallLogKeys.IVR_TRANSCRIPTION}`, 0, -1),
+      redisClient.get(`${sid}__${CallLogKeys.CALL_STATUS}`),
+      redisClient.get(`${sid}__${CallLogKeys.UPDATED_AT}`),
+      redisClient.get(`${sid}__${CallLogKeys.APPLICATION_STATUS}`),
+      redisClient.lRange(`${sid}__${CallLogKeys.TRANSCRIPTION}`, 0, -1),
+      redisClient.lRange(`${sid}__${CallLogKeys.IVR_TRANSCRIPTION}`, 0, -1),
     ]);
 
-    if (!callStatus) {
+    if (!callstatus) {
       return null;
     }
 
     return {
       sid,
-      callStatus,
+      callstatus,
       [CallLogKeys.UPDATED_AT]: parseInt(updatedAt || "0", 10),
-      [CallLogKeys.APPLICATION_STATUS]: JSON.parse(applicationStatusJson || ""),
-      [CallLogKeys.TRANSCRIPTION]: interactionTranscription.map((entry) =>
-        JSON.parse(entry)
-      ),
+      [CallLogKeys.APPLICATION_STATUS]: applicationStatusJson
+        ? JSON.parse(applicationStatusJson)
+        : {},
+      [CallLogKeys.TRANSCRIPTION]: interactionTranscription
+        .map((entry) => JSON.parse(entry))
+        .filter((entry) => entry.role !== "system"),
       [CallLogKeys.IVR_TRANSCRIPTION]: ivrTranscription.map((entry) =>
         JSON.parse(entry)
       ),
@@ -87,18 +95,26 @@ const CallLogService = (function () {
     keyType: CallLogKeys.TRANSCRIPTION | CallLogKeys.IVR_TRANSCRIPTION,
     value: object
   ): Promise<void> {
-    const key = `call_${callSid}_${keyType}`;
+    const key = `${callSid}__${keyType}`;
     const serializedValue = JSON.stringify(value);
     await redisClient.rPush(key, serializedValue);
   }
 
   async function deleteCallLog(callSid: string): Promise<void> {
-    const keys = await redisClient.keys(`call_${callSid}_*`);
+    const keys = await redisClient.keys(`${callSid}_*`);
     await Promise.all(keys.map((key) => redisClient.del(key)));
   }
 
-  async function get(callSid: string, keyType: CallLogKeys) {
-    const key = `call_${callSid}_${keyType}`;
+  async function get(
+    callSid: string,
+    keyType: CallLogKeys
+  ): Promise<
+    | string
+    | Record<string, string>
+    | Array<{ role: "user" | "assistant"; content: string }>
+    | null
+  > {
+    const key = `${callSid}__${keyType}`;
 
     if (
       keyType === CallLogKeys.TRANSCRIPTION ||
