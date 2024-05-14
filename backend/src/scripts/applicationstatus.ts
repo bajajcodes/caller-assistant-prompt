@@ -1,6 +1,5 @@
 import OpenAI from "openai";
-import { redisClient } from "service/redis";
-import { Message } from "types/call";
+import { CallLogKeys, CallLogService } from "service/calllog-service";
 import { MODELS } from "types/openai";
 import { colorErr, colorInfo } from "utils/colorCli";
 import { OPEN_AI_KEY } from "utils/config";
@@ -8,20 +7,9 @@ import { applicationStatusJsonPrompt } from "utils/prompts";
 
 export const generateApplicationStatusJson = async (callSid: string) => {
   try {
-    const callTranscription = await redisClient.lRange(
-      `${callSid}__transcription`,
-      0,
-      -1
-    );
-    if (!callTranscription.length) {
-      return null;
-    }
-    const transcriptionParsed = callTranscription.map(
-      (message) => JSON.parse(message) as Message
-    );
-    const transcription = transcriptionParsed.filter(
-      (transcript) =>
-        transcript.role === "user" || transcript.role === "assistant"
+    const transcription = await CallLogService.get(
+      callSid,
+      CallLogKeys.APPLICATION_STATUS
     );
     const transcriptionString = JSON.stringify(transcription);
     const systemPrompt = applicationStatusJsonPrompt.base
@@ -49,9 +37,6 @@ export const generateApplicationStatusJson = async (callSid: string) => {
     if (!applicationStatusJson) {
       return null;
     }
-    redisClient.del(`${callSid}__callstatus`);
-    redisClient.del(`${callSid}__transcription`);
-    redisClient.del(`${callSid}__ivr--transcription`);
     return JSON.parse(applicationStatusJson);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {

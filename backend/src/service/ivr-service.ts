@@ -2,7 +2,7 @@ import EventEmitter from "events";
 import { BaseResponse, ResponseType } from "types/openai";
 import { colorInfo, colorSuccess, colorWarn } from "utils/colorCli";
 import { ActiveCallConfig } from "./activecall-service";
-import { redisClient } from "./redis";
+import { CallLogKeys, CallLogService } from "./calllog-service";
 
 export interface IVRMenu {
   intent: string;
@@ -82,7 +82,6 @@ export class IVRService extends EventEmitter {
     content: string;
     role: "user" | "assistant";
   }) {
-    const serializedMessage = JSON.stringify(message);
-    redisClient.rPush(`${this.callSid}__ivr--transcription`, serializedMessage);
+    CallLogService.create(this.callSid, CallLogKeys.IVR_TRANSCRIPTION, message);
   }
 }

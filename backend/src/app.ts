@@ -5,10 +5,8 @@ import { generateApplicationStatusJson } from "scripts/applicationstatus";
 import { hangupCall } from "scripts/hangup-call";
 import { makeOutboundCall } from "scripts/outbound-call";
 import { ActiveCallConfig } from "service/activecall-service";
-import { redisClient } from "service/redis";
-import { Message } from "types/call";
+import { CallLogKeys, CallLogService } from "service/calllog-service";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { STORE_KEYS } from "types/redis";
 import { CallData, isValidCallData, updateIVRMenus } from "utils/api";
 import { colorErr } from "utils/colorCli";
 
@@ -24,7 +22,6 @@ app.use(async (req, _, next) => {
   const wsProtocol = protocol === "https" ? "wss" : "ws";
   req.headers.protocol = protocol;
   req.headers.wsProtocol = wsProtocol;
-  await redisClient.set(STORE_KEYS.HOST, req.headers.host!);
   next();
 });
 
@@ -32,65 +29,64 @@ app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
 app.get("/calllog/:callsid", async (req, res) => {
   const sid = req.params.callsid;
-  const status = await redisClient.get(`${sid}__callstatus`);
-  const callTranscription = await redisClient.lRange(
-    `${sid}__transcription`,
-    0,
-    -1
-  );
-  const callIVRTranscription = await redisClient.lRange(
-    `${sid}__ivr--transcription`,
-    0,
-    -1
-  );
-  if (!status && !callTranscription) {
+  if (!sid) {
+    return res.status(400).json({ message: "call sid is missing" });
+  }
+  const callLog = await CallLogService.read(sid);
+  if (!callLog) {
     return res
       .status(404)
       .json({ message: `Call Details not found for CallSid: ${sid}.` });
   }
-  const transcriptionParsed = callTranscription.map(
-    (message) => JSON.parse(message) as Message
-  );
-  const ivrParsed = callIVRTranscription.map(
-    (message) => JSON.parse(message) as Message
-  );
-  const transcription = transcriptionParsed.filter(
-    (transcript) =>
-      transcript.role === "user" || transcript.role === "assistant"
-  );
-  const ivrTranscription = ivrParsed.filter(
-    (transcript) =>
-      transcript.role === "user" || transcript.role === "assistant"
-  );
-
-  return res.json({
-    sid,
-    status,
-    transcription,
-    ivrTranscription,
-  });
+  return res.json(callLog);
 });
 
 app.get("/applicationstatusjson/:callsid", async (req, res) => {
   const sid = req.params.callsid;
-  const applicationStatus = await generateApplicationStatusJson(sid);
+  let applicationStatus = (await CallLogService.get(
+    sid,
+    CallLogKeys.APPLICATION_STATUS
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  )) as Record<string, any>;
+  if (Object.keys(applicationStatus).length) {
+    return res.json(applicationStatus);
+  }
+  applicationStatus = await generateApplicationStatusJson(sid);
   if (!applicationStatus) {
     return res.status(400).json({ message: "Unable to find Transcription." });
   }
+  CallLogService.create(
+    sid,
+    CallLogKeys.APPLICATION_STATUS,
+    applicationStatus as Record<string, string>
+  );
   return res.json(applicationStatus);
 });
 
 app.post("/makeoutboundcall", async (req, res) => {
   try {
     //TODO: find solution for for newlines and ' characters formatting
-    const providerDataString = (req.body.providerData as string)
-      .replaceAll("\n", "")
-      .replaceAll("\n'", "");
-    const ivrMenuString = (req.body.ivrMenu as string)
-      .replaceAll("\n", "")
-      .replaceAll("\n'", "");
-    const plainProviderData = JSON.parse(providerDataString);
-    const plainIvrMenu = JSON.parse(ivrMenuString);
+    let providerDataString = "",
+      ivrMenuString = "";
+
+    if (typeof req.body.providerData === "string") {
+      providerDataString = (req.body.providerData as string)
+        .replaceAll("\\n", "")
+        .replaceAll("\\n'", "");
+    }
+    if (typeof req.body.ivrMenu === "string") {
+      ivrMenuString = (req.body.ivrMenu as string)
+        .replaceAll("\\n", "")
+        .replaceAll("\\n'", "");
+    }
+
+    const plainProviderData = providerDataString
+      ? JSON.parse(providerDataString)
+      : req.body.providerData;
+    const plainIvrMenu = ivrMenuString
+      ? JSON.parse(ivrMenuString)
+      : req.body.ivrMenu;
+
     const callData = {
       providerData: plainProviderData,
       ivrMenu: plainIvrMenu,
@@ -134,7 +130,11 @@ app.post("/callstatusupdate", async (req, res) => {
     "for Call SID:",
     req.body.CallSid
   );
-  redisClient.set(`${req.body.CallSid}__callstatus`, req.body.CallStatus);
+  CallLogService.create(
+    req.body.CallSid,
+    CallLogKeys.CALL_STATUS,
+    req.body.CallStatus
+  );
   return res.status(200).send();
 });
 

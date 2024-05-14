@@ -9,7 +9,7 @@ import {
   systemPromptCollection,
 } from "utils/prompts";
 import { ActiveCallConfig } from "./activecall-service";
-import { redisClient } from "./redis";
+import { CallLogKeys, CallLogService } from "./calllog-service";
 
 type Message = {
   role: "user" | "assistant" | "system";
@@ -122,8 +122,7 @@ export class GPTService extends EventEmitter {
 
   updateUserContext(message: Message) {
     this.context.push(message);
-    const serializedMessage = JSON.stringify(message);
-    redisClient.rPush(`${this.callSid}__transcription`, serializedMessage);
+    CallLogService.create(this.callSid, CallLogKeys.TRANSCRIPTION, message);
     console.log(`gpt: GPT -> user context length: ${this.context.length}`);
   }
 
@@ -145,19 +144,17 @@ export class GPTService extends EventEmitter {
   }
 
   private async initializeTranscription() {
-    const history = await redisClient.lRange(
-      `${this.callSid}__transcription`,
-      0,
-      -1
-    );
-    return history.map((message) => JSON.parse(message) as Message);
+    return (await CallLogService.get(
+      this.callSid,
+      CallLogKeys.TRANSCRIPTION
+    )) as Array<Message>;
   }
 
   private async storeTranscription(message: Message) {
-    const serializedMessage = JSON.stringify(message);
-    await redisClient.rPush(
-      `${this.callSid}__transcription`,
-      serializedMessage
+    await CallLogService.create(
+      this.callSid,
+      CallLogKeys.TRANSCRIPTION,
+      message
     );
   }
 }

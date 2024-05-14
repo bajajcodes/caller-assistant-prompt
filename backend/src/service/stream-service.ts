@@ -5,7 +5,7 @@ import { AssistantResponse, ResponseType } from "types/openai";
 import { colorErr, colorUpdate } from "utils/colorCli";
 import { HOST, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
 import { ActiveCallConfig } from "./activecall-service";
-import { redisClient } from "./redis";
+import { CallLogKeys, CallLogService } from "./calllog-service";
 
 const VoiceResponse = twillio.twiml.VoiceResponse;
 const CALL_TERMINATED_STATUS = [
@@ -41,10 +41,12 @@ export class StreamService extends EventEmitter {
   }
 
   async isCallTerminated() {
-    const callStatusKey = `${this.callSid}__callstatus`;
-    const callStatus = await redisClient.get(callStatusKey);
+    const status = (await CallLogService.get(
+      this.callSid,
+      CallLogKeys.CALL_STATUS
+    )) as string;
 
-    if (callStatus && CALL_TERMINATED_STATUS.includes(callStatus)) {
+    if (status && CALL_TERMINATED_STATUS.includes(status)) {
       return true;
     }
     return false;
