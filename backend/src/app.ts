@@ -6,6 +6,7 @@ import { hangupCall } from "scripts/hangup-call";
 import { makeOutboundCall } from "scripts/outbound-call";
 import { ActiveCallConfig } from "service/activecall-service";
 import { CallLogKeys, CallLogService } from "service/calllog-service";
+import { CALL_TERMINATED_STATUS } from "service/stream-service";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { CallData, isValidCallData, updateIVRMenus } from "utils/api";
 import { colorErr } from "utils/colorCli";
@@ -43,6 +44,15 @@ app.get("/calllog/:callsid", async (req, res) => {
 
 app.get("/applicationstatusjson/:callsid", async (req, res) => {
   const sid = req.params.callsid;
+  const status = (await CallLogService.get(
+    sid,
+    CallLogKeys.CALL_STATUS
+  )) as string;
+  if (!CALL_TERMINATED_STATUS.includes(status)) {
+    return res.status(400).json({
+      message: "Cannot get Application Status Json, call is not terminated.",
+    });
+  }
   let applicationStatus = (await CallLogService.get(
     sid,
     CallLogKeys.APPLICATION_STATUS
@@ -55,16 +65,22 @@ app.get("/applicationstatusjson/:callsid", async (req, res) => {
   if (!applicationStatus) {
     return res.status(400).json({ message: "Unable to find Transcription." });
   }
-  CallLogService.create(
-    sid,
-    CallLogKeys.APPLICATION_STATUS,
-    applicationStatus as Record<string, string>
-  );
+  CallLogService.create(sid, CallLogKeys.APPLICATION_STATUS, applicationStatus);
   return res.json(applicationStatus);
 });
 
 app.post("/makeoutboundcall", async (req, res) => {
   try {
+    const sid = ActiveCallConfig.getInstance().getCallConfig()?.callSid;
+    const status = sid
+      ? ((await CallLogService.get(sid, CallLogKeys.CALL_STATUS)) as string)
+      : "";
+    if (CALL_TERMINATED_STATUS.includes(status)) {
+      return res.status(400).json({
+        message:
+          "Cannot initiate another call when a previous call is in progress.",
+      });
+    }
     //TODO: find solution for for newlines and ' characters formatting
     let providerDataString = "",
       ivrMenuString = "";
@@ -142,6 +158,7 @@ app.post("/hangupcall", async (req, res) => {
   const callSid = req.body.callSid;
   try {
     await hangupCall(callSid);
+    ActiveCallConfig.getInstance().deleteCallConfig();
     return res.status(200).send();
   } catch (err) {
     return res.status(400).send();

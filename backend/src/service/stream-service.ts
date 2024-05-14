@@ -8,7 +8,7 @@ import { ActiveCallConfig } from "./activecall-service";
 import { CallLogKeys, CallLogService } from "./calllog-service";
 
 const VoiceResponse = twillio.twiml.VoiceResponse;
-const CALL_TERMINATED_STATUS = [
+export const CALL_TERMINATED_STATUS = [
   "completed",
   "busy",
   "failed",

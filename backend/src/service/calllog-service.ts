@@ -9,13 +9,24 @@ export enum CallLogKeys {
   APPLICATION_STATUS = "applicationStatus",
 }
 
+export interface CallApplicationJson {
+  status: string;
+  data: Array<Record<string, string>>;
+}
+
 interface CallLog {
   [CallLogKeys.SID]: string;
   [CallLogKeys.CALL_STATUS]: string;
-  [CallLogKeys.TRANSCRIPTION]: { role: string; content: string }[];
-  [CallLogKeys.IVR_TRANSCRIPTION]: { role: string; content: string }[];
+  [CallLogKeys.TRANSCRIPTION]: {
+    role: "system" | "user" | "assistant";
+    content: string;
+  }[];
+  [CallLogKeys.IVR_TRANSCRIPTION]: {
+    role: "user" | "assistant";
+    content: string;
+  }[];
   [CallLogKeys.UPDATED_AT]: number;
-  [CallLogKeys.APPLICATION_STATUS]: Record<string, string>;
+  [CallLogKeys.APPLICATION_STATUS]: CallApplicationJson;
 }
 
 const EXPIRATION_DAYS = 7; // Expiration time in days
@@ -25,8 +36,7 @@ const CallLogService = (function () {
   async function create(
     sid: string,
     keyType: CallLogKeys,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    value: string | Record<string, any>
+    value: string | Record<string, string> | CallApplicationJson
   ): Promise<void> {
     const key = `${sid}__${keyType}`;
     const updatedAt = Date.now();
@@ -110,8 +120,8 @@ const CallLogService = (function () {
     keyType: CallLogKeys
   ): Promise<
     | string
-    | Record<string, string>
-    | Array<{ role: "user" | "assistant"; content: string }>
+    | Array<{ role: "user" | "assistant" | "system"; content: string }>
+    | CallApplicationJson
     | null
   > {
     const key = `${callSid}__${keyType}`;
