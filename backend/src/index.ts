@@ -8,6 +8,7 @@ import { StreamService } from "service/stream-service";
 import { TranscriptionService } from "service/transcription-service";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
+import { deleteActiveCall } from "utils/activecall";
 import { colorErr, colorInfo, colorSuccess, colorUpdate } from "utils/colorCli";
 import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
@@ -152,6 +153,7 @@ const startServer = async () => {
 
       gptService.on("gpterror", () => {
         streamService.endCall();
+        deleteActiveCall();
       });
 
       ivrService.on("ivrreply", async (ivrReply: AssistantResponse) => {
@@ -185,12 +187,14 @@ const startServer = async () => {
           `Message: ${err?.message} Cause: ${err?.cause} Name: ${err.name}`
         )
       );
+      deleteActiveCall();
     });
 
     console.info(`server: listening on port ${PORT}.`);
     server.listen(PORT);
   } catch (err: $TSFixMe) {
     console.error(`server: ${err?.message || "Something went wrong!!"}`);
+    deleteActiveCall();
   }
 };
 
