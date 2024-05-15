@@ -2,14 +2,13 @@
   "name": "caller-assistant-prompt",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
+  "main": "build/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "tsc && tsc-alias && node ./build/index.js --watch",
     "dev": "tsx watch src/index.ts",
+    "lint": "eslint . --ext .ts --fix  && prettier . --write",
     "ui": "rm -rf dist && cd ../frontend && npm install && npm run build && cp -r dist ../backend",
-    "dev:ui": "npm run ui && npm run dev",
-    "start": "tsc && node ./dist/index.js --watch",
-    "lint": "eslint . --ext .ts --fix && prettier . --write"
+    "dev:ui": "npm run ui && npm run start"
   },
   "keywords": [],
   "author": "Shubham Bajaj",
@@ -43,6 +42,7 @@
     "pre-commit": "^1.2.2",
     "prettier": "^3.2.5",
     "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.10",
     "tsx": "^4.7.1",
     "typescript": "^5.4.2"
   },
