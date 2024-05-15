@@ -1,16 +1,21 @@
+import { isCallTransfered } from "@scripts/iscall-transfered";
+import { ActiveCallConfig } from "@service/activecall-service";
+import { GPTService } from "@service/gpt-service";
+import { IVRService } from "@service/ivr-service";
+import { connectRedis } from "@service/redis";
+import { StreamService } from "@service/stream-service";
+import { TranscriptionService } from "@service/transcription-service";
+import { deleteActiveCall } from "@utils/activecall";
+import {
+  colorErr,
+  colorInfo,
+  colorSuccess,
+  colorUpdate,
+} from "@utils/colorCli";
+import { PORT } from "@utils/config";
 import { createServer } from "http";
-import { isCallTransfered } from "scripts/iscall-transfered";
-import { ActiveCallConfig } from "service/activecall-service";
-import { GPTService } from "service/gpt-service";
-import { IVRService } from "service/ivr-service";
-import { connectRedis } from "service/redis";
-import { StreamService } from "service/stream-service";
-import { TranscriptionService } from "service/transcription-service";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
-import { deleteActiveCall } from "utils/activecall";
-import { colorErr, colorInfo, colorSuccess, colorUpdate } from "utils/colorCli";
-import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
 
@@ -81,7 +86,7 @@ const startServer = async () => {
             JSON.stringify({
               streamSid,
               event: "clear",
-            })
+            }),
           );
         }
       });
@@ -108,8 +113,8 @@ const startServer = async () => {
         ) {
           console.log(
             colorUpdate(
-              `Interaction ${interactionCount} – deepgram -> GPT: ${text}`
-            )
+              `Interaction ${interactionCount} – deepgram -> GPT: ${text}`,
+            ),
           );
           gptService.completion(text, interactionCount);
           interactionCount += 1;
@@ -121,8 +126,8 @@ const startServer = async () => {
             `isIVRNavigationCompleted: ${
               ActiveCallConfig.getInstance().getCallConfig()
                 ?.isIVRNavigationCompleted
-            }`
-          )
+            }`,
+          ),
         );
       });
 
@@ -135,20 +140,20 @@ const startServer = async () => {
         async (
           gptReply: AssistantResponse,
           partialResponseIndex,
-          icount: number
+          icount: number,
         ) => {
           console.log(
             colorInfo(
-              `Interaction ${icount}: gpt: GPT -> TTS: ${gptReply.content}`
-            )
+              `Interaction ${icount}: gpt: GPT -> TTS: ${gptReply.content}`,
+            ),
           );
           console.log(
             colorInfo(
-              `Interaction ${icount}: gpt: response-type:${gptReply.responseType}`
-            )
+              `Interaction ${icount}: gpt: response-type:${gptReply.responseType}`,
+            ),
           );
           streamService.sendTwiml(gptReply, partialResponseIndex, icount);
-        }
+        },
       );
 
       gptService.on("gpterror", () => {
@@ -159,7 +164,7 @@ const startServer = async () => {
       ivrService.on("ivrreply", async (ivrReply: AssistantResponse) => {
         console.log(colorInfo(`ivrservice: IVR -> TTS: ${ivrReply.content}`));
         console.log(
-          colorInfo(`ivrservice: response-type:${ivrReply.responseType}`)
+          colorInfo(`ivrservice: response-type:${ivrReply.responseType}`),
         );
         streamService.sendTwiml(ivrReply, -1, -1);
       });
@@ -169,10 +174,10 @@ const startServer = async () => {
         (partialResponseIndex: number, icount: number) => {
           console.log(
             colorInfo(
-              `PartialResponseIndex:${partialResponseIndex} InteractionCount: ${icount}, twilio -> update has been sent`
-            )
+              `PartialResponseIndex:${partialResponseIndex} InteractionCount: ${icount}, twilio -> update has been sent`,
+            ),
           );
-        }
+        },
       );
 
       streamService.on("callended", () => {
@@ -184,8 +189,8 @@ const startServer = async () => {
     wss.on("error", (err) => {
       console.error(
         colorErr(
-          `Message: ${err?.message} Cause: ${err?.cause} Name: ${err.name}`
-        )
+          `Message: ${err?.message} Cause: ${err?.cause} Name: ${err.name}`,
+        ),
       );
       deleteActiveCall();
     });

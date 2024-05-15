@@ -1,15 +1,14 @@
+import { generateApplicationStatusJson } from "@scripts/applicationstatus";
+import { hangupCall } from "@scripts/hangup-call";
+import { makeOutboundCall } from "@scripts/outbound-call";
+import { ActiveCallConfig } from "@service/activecall-service";
+import { CallLogKeys, CallLogService } from "@service/calllog-service";
+import { CALL_TERMINATED_STATUS } from "@service/stream-service";
+import { CallData, isValidCallData, updateIVRMenus } from "@utils/api";
+import { colorErr } from "@utils/colorCli";
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { generateApplicationStatusJson } from "scripts/applicationstatus";
-import { hangupCall } from "scripts/hangup-call";
-import { makeOutboundCall } from "scripts/outbound-call";
-import { ActiveCallConfig } from "service/activecall-service";
-import { CallLogKeys, CallLogService } from "service/calllog-service";
-import { CALL_TERMINATED_STATUS } from "service/stream-service";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { CallData, isValidCallData, updateIVRMenus } from "utils/api";
-import { colorErr } from "utils/colorCli";
 
 const app: Express = express();
 
@@ -46,7 +45,7 @@ app.get("/applicationstatusjson/:callsid", async (req, res) => {
   const sid = req.params.callsid;
   const status = (await CallLogService.get(
     sid,
-    CallLogKeys.CALL_STATUS
+    CallLogKeys.CALL_STATUS,
   )) as string;
   if (!CALL_TERMINATED_STATUS.includes(status)) {
     return res.status(400).json({
@@ -55,7 +54,7 @@ app.get("/applicationstatusjson/:callsid", async (req, res) => {
   }
   let applicationStatus = (await CallLogService.get(
     sid,
-    CallLogKeys.APPLICATION_STATUS
+    CallLogKeys.APPLICATION_STATUS,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   )) as Record<string, any>;
   if (Object.keys(applicationStatus).length) {
@@ -144,12 +143,12 @@ app.post("/callstatusupdate", async (req, res) => {
     "Call Status Update:",
     req.body.CallStatus,
     "for Call SID:",
-    req.body.CallSid
+    req.body.CallSid,
   );
   CallLogService.create(
     req.body.CallSid,
     CallLogKeys.CALL_STATUS,
-    req.body.CallStatus
+    req.body.CallStatus,
   );
   return res.status(200).send();
 });
