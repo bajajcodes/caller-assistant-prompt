@@ -39,18 +39,18 @@ export class IVRService extends EventEmitter {
 
     console.info(colorInfo(`ivrservice: ${transcriptFormatted}`));
     const match = this.ivrMenu.find((menu) =>
-      menu.triggers.some((trigger) => transcriptFormatted.includes(trigger))
+      menu.triggers.some((trigger) => transcriptFormatted.includes(trigger)),
     );
     if (!match) {
       console.log(
-        colorWarn(`ivrservice: No Match for: ${transcriptFormatted}`)
+        colorWarn(`ivrservice: No Match for: ${transcriptFormatted}`),
       );
       return;
     }
     console.log(
       colorSuccess(
-        `ivrservice: Match, ${match.response} for: ${transcriptFormatted}`
-      )
+        `ivrservice: Match, ${match.response} for: ${transcriptFormatted}`,
+      ),
     );
     const ivrReply: BaseResponse = {
       content: match.response,
@@ -66,8 +66,8 @@ export class IVRService extends EventEmitter {
     ) {
       console.log(
         colorInfo(
-          `ivrservice ->  lastOptionIntent: ${this.lastOptionIntent}, matchIntent: ${match.intent}`
-        )
+          `ivrservice ->  lastOptionIntent: ${this.lastOptionIntent}, matchIntent: ${match.intent}`,
+        ),
       );
       ActiveCallConfig.getInstance().setIsLastIVRMenuOptionUsed();
     }

@@ -65,7 +65,7 @@ export class ActiveCallConfig {
   public resetCallConfig(): void {
     if (this.callConfig) {
       console.log(
-        `Resetting call configuration for call ${this.callConfig.callSid}`
+        `Resetting call configuration for call ${this.callConfig.callSid}`,
       );
       this.callConfig = {
         ...this.callConfig,

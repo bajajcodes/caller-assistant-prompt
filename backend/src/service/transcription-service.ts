@@ -50,8 +50,8 @@ export class TranscriptionService extends EventEmitter {
     console.log(
       colorUpdate(
         `endpointing:${transcriptionOptions.endpointing} 
-        utterance_end_ms:${transcriptionOptions.utterance_end_ms}`
-      )
+        utterance_end_ms:${transcriptionOptions.utterance_end_ms}`,
+      ),
     );
     this.deepgramLive = deepgram.listen.live(transcriptionOptions);
     this.finalResult = "";
@@ -64,8 +64,8 @@ export class TranscriptionService extends EventEmitter {
         console.log(colorWarn("deepgram: connection closed"));
         console.log(
           colorErr(
-            `deepgram: number of lost audio packets: ${this.audioBuffer.length + 1}`
-          )
+            `deepgram: number of lost audio packets: ${this.audioBuffer.length + 1}`,
+          ),
         );
         this.emitTranscription();
         this.audioBuffer = [];
@@ -108,15 +108,15 @@ export class TranscriptionService extends EventEmitter {
               });
             }
           }
-        }
+        },
       );
 
       this.deepgramLive.on(LiveTranscriptionEvents.UtteranceEnd, () => {
         if (!this.speechFinal) {
           console.log(
             colorWarn(
-              `UtteranceEnd received before speechFinal, the text collected so far: ${this.finalResult}`
-            )
+              `UtteranceEnd received before speechFinal, the text collected so far: ${this.finalResult}`,
+            ),
           );
           if (
             ActiveCallConfig.getInstance().getCallConfig()
@@ -129,8 +129,8 @@ export class TranscriptionService extends EventEmitter {
         } else {
           console.log(
             colorInfo(
-              "STT -> Speech was already final when UtteranceEnd recevied"
-            )
+              "STT -> Speech was already final when UtteranceEnd recevied",
+            ),
           );
         }
       });
@@ -166,7 +166,7 @@ export class TranscriptionService extends EventEmitter {
 
       if (this.retryAttempts <= MAX_RETRY_ATTEMPTS) {
         console.log(
-          colorWarn(`deepgram: retrying send (attempt ${this.retryAttempts})`)
+          colorWarn(`deepgram: retrying send (attempt ${this.retryAttempts})`),
         );
         setTimeout(() => {
           this.sendBufferedData(bufferedData);
@@ -174,13 +174,13 @@ export class TranscriptionService extends EventEmitter {
       } else {
         console.error(
           colorErr(
-            "deepgram: max retry attempts reached, discarding buffered data"
-          )
+            "deepgram: max retry attempts reached, discarding buffered data",
+          ),
         );
         console.log(
           colorErr(
-            `deepgram: number of lost audio packets: ${this.audioBuffer.length + 1}`
-          )
+            `deepgram: number of lost audio packets: ${this.audioBuffer.length + 1}`,
+          ),
         );
         this.audioBuffer = [];
         this.retryAttempts = 0;

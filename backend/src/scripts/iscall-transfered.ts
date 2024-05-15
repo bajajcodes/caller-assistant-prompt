@@ -26,14 +26,14 @@ export const isCallTransfered = async (userInput: string) => {
     const isTransfered = message ? ["Yes", "yes"].includes(message) : false;
     console.log(
       colorInfo(
-        `call transfered -> isTransfered:${isTransfered} message: ${message} transcription:${userInput}`
-      )
+        `call transfered -> isTransfered:${isTransfered} message: ${message} transcription:${userInput}`,
+      ),
     );
     return isTransfered;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     console.log(
-      colorErr(err?.message || "Failed to analyze is Call Transfered.")
+      colorErr(err?.message || "Failed to analyze is Call Transfered."),
     );
     return false;
   }

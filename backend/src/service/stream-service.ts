@@ -28,7 +28,7 @@ export class StreamService extends EventEmitter {
     this.callSid = "";
     this.twilioClient = new twillio.Twilio(
       TWILIO_ACCOUNT_SID,
-      TWILIO_AUTH_TOKEN
+      TWILIO_AUTH_TOKEN,
     );
   }
 
@@ -43,7 +43,7 @@ export class StreamService extends EventEmitter {
   async isCallTerminated() {
     const status = (await CallLogService.get(
       this.callSid,
-      CallLogKeys.CALL_STATUS
+      CallLogKeys.CALL_STATUS,
     )) as string;
 
     if (status && CALL_TERMINATED_STATUS.includes(status)) {
@@ -72,7 +72,7 @@ export class StreamService extends EventEmitter {
   async sendTwiml(
     message: AssistantResponse,
     partialResponseIndex: number,
-    icount: number
+    icount: number,
   ) {
     try {
       const isCallTerminated = await this.isCallTerminated();
@@ -112,7 +112,7 @@ export class StreamService extends EventEmitter {
       }
     } catch (err: $TSFixMe) {
       console.error(
-        colorErr(`twilio: ${err?.message || "Failed to send twiml"}`)
+        colorErr(`twilio: ${err?.message || "Failed to send twiml"}`),
       );
       console.error(colorErr(err));
       if (err?.code !== 21220) {

@@ -36,7 +36,7 @@ const CallLogService = (function () {
   async function create(
     sid: string,
     keyType: CallLogKeys,
-    value: string | Record<string, string> | CallApplicationJson
+    value: string | Record<string, string> | CallApplicationJson,
   ): Promise<void> {
     const key = `${sid}__${keyType}`;
     const updatedAt = Date.now();
@@ -95,7 +95,7 @@ const CallLogService = (function () {
         .map((entry) => JSON.parse(entry))
         .filter((entry) => entry.role !== "system"),
       [CallLogKeys.IVR_TRANSCRIPTION]: ivrTranscription.map((entry) =>
-        JSON.parse(entry)
+        JSON.parse(entry),
       ),
     };
   }
@@ -103,7 +103,7 @@ const CallLogService = (function () {
   async function update(
     callSid: string,
     keyType: CallLogKeys.TRANSCRIPTION | CallLogKeys.IVR_TRANSCRIPTION,
-    value: object
+    value: object,
   ): Promise<void> {
     const key = `${callSid}__${keyType}`;
     const serializedValue = JSON.stringify(value);
@@ -117,7 +117,7 @@ const CallLogService = (function () {
 
   async function get(
     callSid: string,
-    keyType: CallLogKeys
+    keyType: CallLogKeys,
   ): Promise<
     | string
     | Array<{ role: "user" | "assistant" | "system"; content: string }>

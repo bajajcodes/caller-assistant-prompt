@@ -17,7 +17,7 @@ type Message = {
 };
 
 const getSystemRoleMessage = (
-  providerData: Record<string, unknown>
+  providerData: Record<string, string>
 ): ChatCompletionSystemMessageParam => {
   const providerDataStringified = JSON.stringify(providerData);
   const data = {
