@@ -5,6 +5,7 @@ import { ActiveCallConfig } from "@service/activecall-service";
 import { CallLogKeys, CallLogService } from "@service/calllog-service";
 import { CALL_TERMINATED_STATUS } from "@service/stream-service";
 import { CallData, isValidCallData, updateIVRMenus } from "@utils/api";
+import { isValidCallSid } from "@utils/call";
 import { colorErr } from "@utils/colorCli";
 import cors from "cors";
 import type { Express } from "express";
@@ -29,8 +30,8 @@ app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
 
 app.get("/calllog/:callsid", async (req, res) => {
   const sid = req.params.callsid;
-  if (!sid) {
-    return res.status(400).json({ message: "call sid is missing" });
+  if (!sid || !isValidCallSid(sid)) {
+    return res.status(400).json({ message: "call sid is missing or invalid." });
   }
   const callLog = await CallLogService.read(sid);
   if (!callLog) {
@@ -43,9 +44,12 @@ app.get("/calllog/:callsid", async (req, res) => {
 
 app.get("/applicationstatusjson/:callsid", async (req, res) => {
   const sid = req.params.callsid;
+  if (!sid || !isValidCallSid(sid)) {
+    return res.status(400).json({ message: "call sid is missing or invalid." });
+  }
   const status = (await CallLogService.get(
     sid,
-    CallLogKeys.CALL_STATUS,
+    CallLogKeys.CALL_STATUS
   )) as string;
   if (!CALL_TERMINATED_STATUS.includes(status)) {
     return res.status(400).json({
@@ -54,7 +58,7 @@ app.get("/applicationstatusjson/:callsid", async (req, res) => {
   }
   let applicationStatus = (await CallLogService.get(
     sid,
-    CallLogKeys.APPLICATION_STATUS,
+    CallLogKeys.APPLICATION_STATUS
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   )) as Record<string, any>;
   if (Object.keys(applicationStatus).length) {
@@ -143,12 +147,12 @@ app.post("/callstatusupdate", async (req, res) => {
     "Call Status Update:",
     req.body.CallStatus,
     "for Call SID:",
-    req.body.CallSid,
+    req.body.CallSid
   );
   CallLogService.create(
     req.body.CallSid,
     CallLogKeys.CALL_STATUS,
-    req.body.CallStatus,
+    req.body.CallStatus
   );
   return res.status(200).send();
 });

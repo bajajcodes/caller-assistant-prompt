@@ -49,7 +49,7 @@ GET /calllog/CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     ```
   - Status code: 400 (Bad Request)
 
-    - Body: `{ message: "call sid is missing" }`
+    - Body: `{ message: "call sid is missing or invalid" }`
 
   - Status code: 404 (Not Found)
     - Body: `{ message: "Call Details not found for CallSid: CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx." }`
@@ -85,7 +85,7 @@ GET /applicationstatusjson/CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
           "value": "no"
         },
         {
-          "key": "applicationtrackingnumber",
+          "key": "applicationtrac kingnumber",
           "value": "N/A"
         },
         {
@@ -101,6 +101,7 @@ GET /applicationstatusjson/CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     ```
   - Status code: 400 (Bad Request)
     - Body:
+      - `{ message: "call sid is missing or invalid" }`
       - `{ message: "Call Has not finished yet, cannot get Application Status Json." }`
       - `{ message: "Unable to find Transcription." }`
 
