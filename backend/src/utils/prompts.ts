@@ -121,6 +121,8 @@ export const applicationStatusJsonPrompt = {
   base: `
   You are an AI assistant responsible for creating JSON outputs based on call transcriptions between customer representatives and callers. Your task is to analyze the call transcript, identify the relevant case scenario mentioned in the document, and generate the corresponding JSON output following the rules and structure specified in the document.
 
+  Exclude the Desc property of data array from JSON output.
+
   The transcript will contain information about the status of a provider's enrollment application with a specific payer (insurance company). Your goal is to understand the situation described in the transcript and map it to one of the predefined cases in the document. Then, you will construct the appropriate JSON output by populating the relevant keys and values according to the instructions provided for that case.
 
   Your JSON output should be well-structured, following the provided format, and should include all the necessary information mentioned in the transcript, mapped to the correct keys and values as per the document's instructions.

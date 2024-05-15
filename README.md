@@ -85,7 +85,8 @@ REDIS_CLIENT_URL=redis://localhost:6379
 
 **4. Run the Project:**
 
-- Simply run `npm run dev` in your terminal.
+- (Optional) Type into terminal `npm run ui` to copy frontend build if doesn't exisits as `dist` inside `backend` directory.
+- Simply run `npm run start` in your terminal.
 - This will start the project and automatically reload any changes you make.
 
 **That's it!** Your project should now be running, typically on port 3000 (check your terminal output for confirmation).

@@ -161,6 +161,7 @@ app.post("/hangupcall", async (req, res) => {
   const callSid = req.body.callSid;
   try {
     await hangupCall(callSid);
+    CallLogService.create(callSid, CallLogKeys.CALL_ENDED_BY, "/hangupcall");
     ActiveCallConfig.getInstance().deleteCallConfig();
     return res.status(200).send();
   } catch (err) {

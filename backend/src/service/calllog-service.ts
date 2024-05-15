@@ -3,6 +3,7 @@ import { redisClient } from "./redis";
 export enum CallLogKeys {
   SID = "sid",
   CALL_STATUS = "callstatus",
+  CALL_ENDED_BY = "callEndedBy",
   TRANSCRIPTION = "transcription",
   IVR_TRANSCRIPTION = "ivr--transcription",
   UPDATED_AT = "updatedAt",
@@ -17,6 +18,7 @@ export interface CallApplicationJson {
 interface CallLog {
   [CallLogKeys.SID]: string;
   [CallLogKeys.CALL_STATUS]: string;
+  [CallLogKeys.CALL_ENDED_BY]: string;
   [CallLogKeys.TRANSCRIPTION]: {
     role: "system" | "user" | "assistant";
     content: string;
@@ -36,7 +38,7 @@ const CallLogService = (function () {
   async function create(
     sid: string,
     keyType: CallLogKeys,
-    value: string | Record<string, string> | CallApplicationJson,
+    value: string | Record<string, string> | CallApplicationJson
   ): Promise<void> {
     const key = `${sid}__${keyType}`;
     const updatedAt = Date.now();
@@ -68,12 +70,14 @@ const CallLogService = (function () {
   async function read(sid: string): Promise<CallLog | null> {
     const [
       callstatus,
+      callEndedBy,
       updatedAt,
       applicationStatusJson,
       interactionTranscription,
       ivrTranscription,
     ] = await Promise.all([
       redisClient.get(`${sid}__${CallLogKeys.CALL_STATUS}`),
+      redisClient.get(`${sid}__${CallLogKeys.CALL_ENDED_BY}`),
       redisClient.get(`${sid}__${CallLogKeys.UPDATED_AT}`),
       redisClient.get(`${sid}__${CallLogKeys.APPLICATION_STATUS}`),
       redisClient.lRange(`${sid}__${CallLogKeys.TRANSCRIPTION}`, 0, -1),
@@ -87,6 +91,7 @@ const CallLogService = (function () {
     return {
       sid,
       callstatus,
+      callEndedBy: callEndedBy || "NA",
       [CallLogKeys.UPDATED_AT]: parseInt(updatedAt || "0", 10),
       [CallLogKeys.APPLICATION_STATUS]: applicationStatusJson
         ? JSON.parse(applicationStatusJson)
@@ -95,7 +100,7 @@ const CallLogService = (function () {
         .map((entry) => JSON.parse(entry))
         .filter((entry) => entry.role !== "system"),
       [CallLogKeys.IVR_TRANSCRIPTION]: ivrTranscription.map((entry) =>
-        JSON.parse(entry),
+        JSON.parse(entry)
       ),
     };
   }
@@ -103,7 +108,7 @@ const CallLogService = (function () {
   async function update(
     callSid: string,
     keyType: CallLogKeys.TRANSCRIPTION | CallLogKeys.IVR_TRANSCRIPTION,
-    value: object,
+    value: object
   ): Promise<void> {
     const key = `${callSid}__${keyType}`;
     const serializedValue = JSON.stringify(value);
@@ -117,7 +122,7 @@ const CallLogService = (function () {
 
   async function get(
     callSid: string,
-    keyType: CallLogKeys,
+    keyType: CallLogKeys
   ): Promise<
     | string
     | Array<{ role: "user" | "assistant" | "system"; content: string }>
