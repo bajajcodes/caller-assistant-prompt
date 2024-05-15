@@ -5,7 +5,7 @@ import { ActiveCallConfig } from "@service/activecall-service";
 import { CallLogKeys, CallLogService } from "@service/calllog-service";
 import { CALL_TERMINATED_STATUS } from "@service/stream-service";
 import { CallData, isValidCallData, updateIVRMenus } from "@utils/api";
-import { isValidCallSid } from "@utils/call";
+import { isValidCallSid, scheduleCallStatusCheck } from "@utils/call";
 import { colorErr } from "@utils/colorCli";
 import cors from "cors";
 import type { Express } from "express";
@@ -121,6 +121,8 @@ app.post("/makeoutboundcall", async (req, res) => {
         .status(400)
         .json({ message: "Failed to initiate the call.", callSid: null });
     }
+    scheduleCallStatusCheck(call.sid);
+
     const { transformedIvrMenu, updatedIvrMenu } = updateIVRMenus(callData);
     callData.ivrMenu = updatedIvrMenu;
     ActiveCallConfig.getInstance().setCallConfig({
