@@ -3,9 +3,10 @@ import twillio, { Twilio } from "twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse, ResponseType } from "types/openai";
 import { colorErr, colorUpdate } from "utils/colorCli";
-import { HOST, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
+import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
 import { ActiveCallConfig } from "./activecall-service";
 import { CallLogKeys, CallLogService } from "./calllog-service";
+import { redisClient } from "./redis";
 
 const VoiceResponse = twillio.twiml.VoiceResponse;
 export const CALL_TERMINATED_STATUS = [
@@ -28,7 +29,7 @@ export class StreamService extends EventEmitter {
     this.callSid = "";
     this.twilioClient = new twillio.Twilio(
       TWILIO_ACCOUNT_SID,
-      TWILIO_AUTH_TOKEN,
+      TWILIO_AUTH_TOKEN
     );
   }
 
@@ -43,7 +44,7 @@ export class StreamService extends EventEmitter {
   async isCallTerminated() {
     const status = (await CallLogService.get(
       this.callSid,
-      CallLogKeys.CALL_STATUS,
+      CallLogKeys.CALL_STATUS
     )) as string;
 
     if (status && CALL_TERMINATED_STATUS.includes(status)) {
@@ -72,7 +73,7 @@ export class StreamService extends EventEmitter {
   async sendTwiml(
     message: AssistantResponse,
     partialResponseIndex: number,
-    icount: number,
+    icount: number
   ) {
     try {
       const isCallTerminated = await this.isCallTerminated();
@@ -94,7 +95,9 @@ export class StreamService extends EventEmitter {
             const digits = content;
             response.play({ digits });
           }
+          const HOST = await redisClient.get("HOST");
           const connect = response.connect();
+          console.log({ HOST });
           connect.stream({
             url: `wss://${HOST}`,
             track: "inbound_track",
@@ -112,7 +115,7 @@ export class StreamService extends EventEmitter {
       }
     } catch (err: $TSFixMe) {
       console.error(
-        colorErr(`twilio: ${err?.message || "Failed to send twiml"}`),
+        colorErr(`twilio: ${err?.message || "Failed to send twiml"}`)
       );
       console.error(colorErr(err));
       if (err?.code !== 21220) {

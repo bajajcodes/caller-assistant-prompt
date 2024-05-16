@@ -3,6 +3,7 @@ import { hangupCall } from "@scripts/hangup-call";
 import { makeOutboundCall } from "@scripts/outbound-call";
 import { ActiveCallConfig } from "@service/activecall-service";
 import { CallLogKeys, CallLogService } from "@service/calllog-service";
+import { redisClient } from "@service/redis";
 import { CALL_TERMINATED_STATUS } from "@service/stream-service";
 import { CallData, isValidCallData, updateIVRMenus } from "@utils/api";
 import { isValidCallSid, scheduleCallStatusCheck } from "@utils/call";
@@ -26,7 +27,11 @@ app.use(async (req, _, next) => {
   next();
 });
 
-app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
+app.get("/", (req, res) => {
+  //if this doesn't work switch back to process.env.SERVER
+  redisClient.set("HOST", req.hostname);
+  res.send("Hello World 👋, from Caller Assistant!!");
+});
 
 app.get("/calllog/:callsid", async (req, res) => {
   const sid = req.params.callsid;
@@ -114,7 +119,12 @@ app.post("/makeoutboundcall", async (req, res) => {
     if (!isValid) {
       return res.status(400).json({ message, callSid: null });
     }
-    const call = await makeOutboundCall(callData.providerData.phoneNumber);
+    console.log(req.hostname, req.headers.host);
+    const call = await makeOutboundCall({
+      callTo: callData.providerData.phoneNumber,
+      hostname: req.hostname,
+      isHTTPS: req.headers.protocol === "https",
+    });
 
     if (!call.sid) {
       return res
