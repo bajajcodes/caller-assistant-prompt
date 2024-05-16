@@ -3,6 +3,7 @@ import VoiceResponse from "twilio/lib/twiml/VoiceResponse";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { $TSFixMe } from "types/common";
 import {
+  SERVER,
   TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN,
   TWILIO_FROM_NUMBER,
@@ -10,15 +11,13 @@ import {
 
 export const makeOutboundCall = async ({
   callTo,
-  hostname,
   isHTTPS,
 }: {
   callTo: string;
-  hostname: string;
   isHTTPS: boolean;
 }) => {
   try {
-    if (!hostname) {
+    if (!SERVER) {
       throw Error("host address is missing.");
     }
     if (!TWILIO_FROM_NUMBER) {
@@ -27,9 +26,8 @@ export const makeOutboundCall = async ({
     if (!callTo) {
       throw Error("call to phone number is missing.");
     }
-    const wsUrl = `${isHTTPS ? "wss" : "ws"}://${hostname}`;
-    const serverUrl = `${isHTTPS ? "https" : "http"}://${hostname}/callstatusupdate`;
-    console.log({ wsUrl, serverUrl });
+    const wsUrl = `${isHTTPS ? "wss" : "ws"}://${SERVER}`;
+    const serverUrl = `${isHTTPS ? "https" : "http"}://${SERVER}/callstatusupdate`;
     const response = new VoiceResponse();
     const connect = response.connect();
     response.say("");

@@ -1,9 +1,9 @@
 import { generateApplicationStatusJson } from "@scripts/applicationstatus";
+import { getCallStatus } from "@scripts/call-status";
 import { hangupCall } from "@scripts/hangup-call";
 import { makeOutboundCall } from "@scripts/outbound-call";
 import { ActiveCallConfig } from "@service/activecall-service";
 import { CallLogKeys, CallLogService } from "@service/calllog-service";
-import { redisClient } from "@service/redis";
 import { CALL_TERMINATED_STATUS } from "@service/stream-service";
 import { CallData, isValidCallData, updateIVRMenus } from "@utils/api";
 import { isValidCallSid, scheduleCallStatusCheck } from "@utils/call";
@@ -27,9 +27,7 @@ app.use(async (req, _, next) => {
   next();
 });
 
-app.get("/", (req, res) => {
-  //if this doesn't work switch back to process.env.SERVER
-  redisClient.set("HOST", req.hostname);
+app.get("/", (_, res) => {
   res.send("Hello World 👋, from Caller Assistant!!");
 });
 
@@ -52,11 +50,8 @@ app.get("/applicationstatusjson/:callsid", async (req, res) => {
   if (!sid || !isValidCallSid(sid)) {
     return res.status(400).json({ message: "call sid is missing or invalid." });
   }
-  const status = (await CallLogService.get(
-    sid,
-    CallLogKeys.CALL_STATUS
-  )) as string;
-  if (!CALL_TERMINATED_STATUS.includes(status)) {
+  const status = await getCallStatus(sid);
+  if (status && !CALL_TERMINATED_STATUS.includes(status)) {
     return res.status(400).json({
       message: "Cannot get Application Status Json, call is not terminated.",
     });
@@ -80,10 +75,8 @@ app.get("/applicationstatusjson/:callsid", async (req, res) => {
 app.post("/makeoutboundcall", async (req, res) => {
   try {
     const sid = ActiveCallConfig.getInstance().getCallConfig()?.callSid;
-    const status = sid
-      ? ((await CallLogService.get(sid, CallLogKeys.CALL_STATUS)) as string)
-      : "";
-    if (!CALL_TERMINATED_STATUS.includes(status)) {
+    const status = sid ? await getCallStatus(sid) : null;
+    if (sid && status && !CALL_TERMINATED_STATUS.includes(status)) {
       return res.status(400).json({
         message:
           "Cannot initiate another call when a previous call is in progress.",
@@ -119,10 +112,9 @@ app.post("/makeoutboundcall", async (req, res) => {
     if (!isValid) {
       return res.status(400).json({ message, callSid: null });
     }
-    console.log(req.hostname, req.headers.host);
+
     const call = await makeOutboundCall({
       callTo: callData.providerData.phoneNumber,
-      hostname: req.hostname,
       isHTTPS: req.headers.protocol === "https",
     });
 

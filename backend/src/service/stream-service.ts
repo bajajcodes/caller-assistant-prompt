@@ -3,10 +3,9 @@ import twillio, { Twilio } from "twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse, ResponseType } from "types/openai";
 import { colorErr, colorUpdate } from "utils/colorCli";
-import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
+import { SERVER, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
 import { ActiveCallConfig } from "./activecall-service";
 import { CallLogKeys, CallLogService } from "./calllog-service";
-import { redisClient } from "./redis";
 
 const VoiceResponse = twillio.twiml.VoiceResponse;
 export const CALL_TERMINATED_STATUS = [
@@ -95,11 +94,9 @@ export class StreamService extends EventEmitter {
             const digits = content;
             response.play({ digits });
           }
-          const HOST = await redisClient.get("HOST");
           const connect = response.connect();
-          console.log({ HOST });
           connect.stream({
-            url: `wss://${HOST}`,
+            url: `wss://${SERVER}`,
             track: "inbound_track",
           });
 

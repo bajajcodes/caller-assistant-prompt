@@ -4,15 +4,17 @@ import twillio from "twilio";
 import { $TSFixMe } from "types/common";
 import { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } from "utils/config";
 
-export const hangupCall = async (callSid: string) => {
+export const getCallStatus = async (callSid: string) => {
   try {
+    if (!callSid) return null;
     const client = new twillio.Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-    const update = await client.calls(callSid).update({ status: "completed" });
+    const update = await client.calls(callSid).fetch();
     CallLogService.create(callSid, CallLogKeys.CALL_STATUS, update.status);
-    CallLogService.create(callSid, CallLogKeys.CALL_ENDED_BY, "/hangupcall");
-    console.info("twilio: hangup call done.");
+    console.log(`callstatus: ${update.status} for callsid: ${callSid}`);
+    return update.status;
   } catch (err: $TSFixMe) {
     const reason = err?.message;
-    console.error(`twilio: ${reason || "failed to hangup call."}`);
+    console.error(`twilio: ${reason || "failed to get status."}`);
+    return null;
   }
 };
