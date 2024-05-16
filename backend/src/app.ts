@@ -83,7 +83,7 @@ app.post("/makeoutboundcall", async (req, res) => {
     const status = sid
       ? ((await CallLogService.get(sid, CallLogKeys.CALL_STATUS)) as string)
       : "";
-    if (CALL_TERMINATED_STATUS.includes(status)) {
+    if (!CALL_TERMINATED_STATUS.includes(status)) {
       return res.status(400).json({
         message:
           "Cannot initiate another call when a previous call is in progress.",
