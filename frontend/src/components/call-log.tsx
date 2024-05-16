@@ -58,6 +58,10 @@ export const CallLog = () => {
     }
   );
 
+  const callstatus = data?.callstatus || "NA";
+  const ivrTranscription = data?.["ivr--transcription"] || [];
+  const transcription = data?.transcription || [];
+
   return (
     <div className="flex flex-col gap-4 md:gap-2">
       <h2 className="text-lg">Call Log</h2>
@@ -113,14 +117,14 @@ export const CallLog = () => {
           <CardContent className="grid gap-4">
             <div className="flex items-center gap-4">
               <CardDescription>Call Status</CardDescription>
-              <p>{data.status}</p>
+              <p>{callstatus}</p>
             </div>
             <div>
               <CardDescription>
                 Customer Rep Interaction Transcription
               </CardDescription>
               <div className="max-h-[50vh] overflow-scroll p-2 border-2">
-                {data.transcription.map(
+                {transcription.map(
                   (
                     message: { role: string; content: string },
                     index: number
@@ -131,7 +135,7 @@ export const CallLog = () => {
                     </p>
                   )
                 )}
-                {data.transcription.length < 1 && (
+                {transcription.length < 1 && (
                   <p className="text-sm">
                     {isMutating
                       ? "Fetching Interaction Transcription."
@@ -143,7 +147,7 @@ export const CallLog = () => {
             <div>
               <CardDescription>IVR Interaction Transcription</CardDescription>
               <div className="max-h-[50vh] overflow-scroll p-2 border-2">
-                {data.ivrTranscription.map(
+                {ivrTranscription.map(
                   (
                     message: { role: string; content: string },
                     index: number
@@ -154,7 +158,7 @@ export const CallLog = () => {
                     </p>
                   )
                 )}
-                {data.ivrTranscription.length < 1 && (
+                {ivrTranscription.length < 1 && (
                   <p className="text-sm">
                     {isMutating
                       ? "Fetching IVR Interaction Transcription."
@@ -169,7 +173,7 @@ export const CallLog = () => {
       {!isMutating && error && (
         <Card className="mt-4">
           <CardContent className="text-red-500 pt-6">
-            Error: {error.message}
+            Error: {error?.message || "NA"}
           </CardContent>
         </Card>
       )}
