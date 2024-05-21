@@ -4,7 +4,8 @@
   "description": "",
   "main": "build/index.js",
   "scripts": {
-    "start": "tsc && tsc-alias && node ./build/index.js --watch",
+    "build": "tsc && tsc-alias",
+    "start": "node ./build/index.js --watch",
     "dev": "tsx watch src/index.ts",
     "lint": "eslint . --ext .ts --fix  && prettier . --write",
     "ui": "rm -rf dist && cd ../frontend && npm install && npm run build && cp -r dist ../backend",
