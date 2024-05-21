@@ -20,8 +20,10 @@ app.use(express.json());
 app.use(express.static("dist"));
 
 app.use(async (req, _, next) => {
-  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
-  const wsProtocol = protocol === "https" ? "wss" : "ws";
+  // const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  // const wsProtocol = protocol === "https" ? "wss" : "ws";
+  const protocol = "https";
+  const wsProtocol = "wss";
   req.headers.protocol = protocol;
   req.headers.wsProtocol = wsProtocol;
   next();

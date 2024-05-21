@@ -11,7 +11,6 @@ import {
 
 export const makeOutboundCall = async ({
   callTo,
-  isHTTPS,
 }: {
   callTo: string;
   isHTTPS: boolean;
@@ -26,8 +25,10 @@ export const makeOutboundCall = async ({
     if (!callTo) {
       throw Error("call to phone number is missing.");
     }
-    const wsUrl = `${isHTTPS ? "wss" : "ws"}://${SERVER}`;
-    const serverUrl = `${isHTTPS ? "https" : "http"}://${SERVER}/callstatusupdate`;
+    // const wsUrl = `${isHTTPS ? "wss" : "ws"}://${SERVER}`;
+    // const serverUrl = `${isHTTPS ? "https" : "http"}://${SERVER}/callstatusupdate`;
+    const wsUrl = `wss://${SERVER}`;
+    const serverUrl = `https://${SERVER}/callstatusupdate`;
     const response = new VoiceResponse();
     const connect = response.connect();
     response.say("");
