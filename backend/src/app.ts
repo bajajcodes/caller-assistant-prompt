@@ -138,10 +138,9 @@ app.post("/makeoutboundcall", async (req, res) => {
     scheduleCallStatusCheck(call.sid);
 
     const { transformedIvrMenu, updatedIvrMenu } = updateIVRMenus(callData);
-    callData.ivrMenu = updatedIvrMenu;
     ActiveCallConfig.getInstance().setCallConfig({
       callSid: call.sid,
-      ivrMenu: callData.ivrMenu,
+      ivrMenu: updatedIvrMenu,
       providerData: callData.providerData,
     });
     //TODO: refactor to one function call
