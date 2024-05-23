@@ -14,6 +14,7 @@ const API_BASE_URL = process.env.API_BASE_URL;
 const LLM_MODEL_SWITCH_DURATION = process.env.LLM_MODEL_SWITCH_DURATION;
 const CALL_QUEUE_DELAY = process.env.CALL_QUEUE_DELAY;
 const SERVER = process.env.SERVER;
+const WEBHOOK_URL = process.env.WEBHOOK_URL;
 
 export {
   API_BASE_URL,
@@ -28,4 +29,5 @@ export {
   TWILIO_AUTH_TOKEN,
   TWILIO_FROM_NUMBER,
   TWILIO_TO_NUMBER,
+  WEBHOOK_URL,
 };

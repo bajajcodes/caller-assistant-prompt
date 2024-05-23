@@ -2,6 +2,7 @@ import { generateApplicationStatusJson } from "@scripts/applicationstatus";
 import { getCallStatus } from "@scripts/call-status";
 import { hangupCall } from "@scripts/hangup-call";
 import { makeOutboundCall } from "@scripts/outbound-call";
+import { triggerWebhook } from "@scripts/triggerwebhook";
 import { ActiveCallConfig } from "@service/activecall-service";
 import { CallLogKeys, CallLogService } from "@service/calllog-service";
 import { CALL_TERMINATED_STATUS } from "@service/stream-service";
@@ -74,6 +75,15 @@ app.get("/applicationstatusjson/:callsid", async (req, res) => {
   return res.json(applicationStatus);
 });
 
+app.get("/triggerwebhook/:callsid", async (req, res) => {
+  const sid = req.params.callsid;
+  if (!sid || !isValidCallSid(sid)) {
+    return res.status(400).json({ message: "call sid is missing or invalid." });
+  }
+  await triggerWebhook(sid);
+  return res.json();
+});
+
 app.post("/makeoutboundcall", async (req, res) => {
   try {
     const sid = ActiveCallConfig.getInstance().getCallConfig()?.callSid;
@@ -134,6 +144,22 @@ app.post("/makeoutboundcall", async (req, res) => {
       ivrMenu: callData.ivrMenu,
       providerData: callData.providerData,
     });
+    //TODO: refactor to one function call
+    CallLogService.create(
+      call.sid,
+      CallLogKeys.PROVIDED_IVR_MENU,
+      callData.ivrMenu
+    );
+    CallLogService.create(
+      call.sid,
+      CallLogKeys.TRANSFORMED_IVR_MENU,
+      transformedIvrMenu
+    );
+    CallLogService.create(
+      call.sid,
+      CallLogKeys.INTERNAL_USED_IVR_MENU,
+      updatedIvrMenu
+    );
     res.json({
       message: `Call initiated`,
       callSid: call.sid,
@@ -160,6 +186,9 @@ app.post("/callstatusupdate", async (req, res) => {
     CallLogKeys.CALL_STATUS,
     req.body.CallStatus
   );
+  if (CALL_TERMINATED_STATUS.includes(req.body.CallStatus)) {
+    triggerWebhook(req.body.CallSid);
+  }
   return res.status(200).send();
 });
 

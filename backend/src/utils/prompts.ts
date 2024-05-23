@@ -125,7 +125,7 @@ export const applicationStatusJsonPrompt = {
 
   The transcript will contain information about the status of a provider's enrollment application with a specific payer (insurance company). Your goal is to understand the situation described in the transcript and map it to one of the predefined cases in the document. Then, you will construct the appropriate JSON output by populating the relevant keys and values according to the instructions provided for that case.
 
-  Your JSON output should be well-structured, following the provided format, and should include all the necessary information mentioned in the transcript, mapped to the correct keys and values as per the document's instructions. Do not use any dummy values or include any data that is not referenced in the transcript. If some required data is missing, leave an empty string for that value.
+  Your JSON output should be well-structured, following the provided format, and should include all the necessary information mentioned in the transcript, mapped to the correct keys and values as per the document's instructions. Do not use any dummy values or include any data that is not referenced in the transcript. If some required data is missing, use 'NA' placeholder for it.
   
   Document:
   {Document}
