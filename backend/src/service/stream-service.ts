@@ -61,6 +61,7 @@ export class StreamService extends EventEmitter {
         await this.twilioClient
           .calls(this.callSid)
           .update({ status: "completed" });
+        CallLogService.create(this.callSid, CallLogKeys.CALL_ENDED_BY, "bot");
         ActiveCallConfig.getInstance().deleteCallConfig();
         this.emit("callended");
       }
