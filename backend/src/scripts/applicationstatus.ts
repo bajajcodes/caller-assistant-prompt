@@ -9,7 +9,7 @@ export const generateApplicationStatusJson = async (callSid: string) => {
   try {
     const transcription = await CallLogService.get(
       callSid,
-      CallLogKeys.APPLICATION_STATUS,
+      CallLogKeys.TRANSCRIPTION
     );
     const transcriptionString = JSON.stringify(transcription);
     const systemPrompt = applicationStatusJsonPrompt.base
@@ -41,7 +41,7 @@ export const generateApplicationStatusJson = async (callSid: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     console.log(
-      colorErr(err?.message || "Failed to generate Application Status Json."),
+      colorErr(err?.message || "Failed to generate Application Status Json.")
     );
     return false;
   }
