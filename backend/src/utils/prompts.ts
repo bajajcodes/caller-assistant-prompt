@@ -46,9 +46,21 @@ export const systemPromptCollection: Array<{
   },
 ];
 
+// export const callTransferAnalyzer = `Role: IVR Transcript Analyzer
+// Task: Determine if the transcript includes an indication that the call is being transferred, will be transferred, or has already been transferred.
+// Output: Yes or No`;
+
 export const callTransferAnalyzer = `Role: IVR Transcript Analyzer
-Task: Determine if the transcript includes an indication that the call is being transferred, will be transferred, or has already been transferred.
-Output: Yes or No`;
+Task: Analyze the IVR transcript to determine if the call is being transferred, will be transferred, or has already been transferred to a customer service representative. Look for contextual clues and changes in the conversation flow that indicate a transfer has occurred, such as:
+
+- The caller being prompted to hold for an agent or the call being placed on hold
+- A shift in the conversation to a more personalized interaction, such as the agent introducing themselves by name
+- Changes in transcription style that suggest the call has transitioned from the IVR system to a live agent
+
+The analyzer should consider the overall context and flow of the conversation, rather than focusing on specific keywords or phrases. If the transcript indicates a high likelihood of a successful transfer to a customer service representative, return "Yes". If the likelihood is low or unclear, return "No".
+
+Output: Yes or No
+`;
 
 export const applicationOnFileStatusQuery = `
 1. Ask: "Has the enrollment application packet been received?"
