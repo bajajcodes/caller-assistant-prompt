@@ -1,135 +1,207 @@
-import { LiveTranscriptionEvents } from "@deepgram/sdk";
-import EventEmitter from "events";
+import { isCallTransfered } from "@scripts/iscall-transfered";
+import { ActiveCallConfig } from "@service/activecall-service";
+import { GPTService } from "@service/gpt-service";
+import { IVRService } from "@service/ivr-service";
+import { connectRedis } from "@service/redis";
+import { StreamService } from "@service/stream-service";
+import { TranscriptionService } from "@service/transcription-service";
+import { deleteActiveCall } from "@utils/activecall";
+import {
+  colorErr,
+  colorInfo,
+  colorSuccess,
+  colorUpdate,
+} from "@utils/colorCli";
+import { PORT } from "@utils/config";
 import { createServer } from "http";
-import { connectDeepgram, deepgramClient } from "service/deepgram";
-import { agent, connectOpenAI } from "service/openai";
-import { connectRedis, redisClient } from "service/redis";
-import { connectTwilio, updateInProgessCall } from "service/twilio";
 import { $TSFixMe } from "types/common";
 import { AssistantResponse } from "types/openai";
-import { STORE_KEYS } from "types/redis";
-import { PORT } from "utils/config";
 import { WebSocketServer } from "ws";
 import app from "./app";
-
-let transcriptCollection: Array<string> = [];
-const assistantMessages: Array<AssistantResponse> = [];
-const messageQueue = new EventEmitter();
-const port = PORT || 3000;
-
-const enqueueAssistantMessage = (assitantResponse: AssistantResponse) => {
-  assistantMessages.push(assitantResponse);
-  messageQueue.emit("new_message");
-};
 
 const startServer = async () => {
   try {
     const server = createServer(app);
     const wss = new WebSocketServer({ server });
-    const openaiClient = await connectOpenAI();
     wss.on("connection", (ws) => {
-      console.info("New Client Connected");
-      const deepgramConnection = deepgramClient.listen.live({
-        model: "enhanced-phonecall",
-        smart_format: true,
-        encoding: "mulaw",
-        sample_rate: 8000,
-        channels: 1,
+      let streamSid: string = "";
+      let callSid: string = "";
+
+      console.info("socket: new client connected.");
+
+      const ivrMenu = ActiveCallConfig.getInstance().getCallConfig()?.ivrMenu;
+      const streamService = new StreamService(ws);
+      const transcriptionService = new TranscriptionService();
+      const gptService = new GPTService();
+      //TODO: throw error if ivrMenu is undefined
+      const ivrService = new IVRService(ivrMenu || []);
+      // let marks = [];
+      let interactionCount = 0;
+
+      ws.on("message", (data: $TSFixMe) => {
+        const twilioMessage = JSON.parse(data);
+
+        if (twilioMessage["event"] === "start") {
+          console.info("socket: received a twilio start event.");
+          streamSid = twilioMessage.start.streamSid;
+          callSid = twilioMessage.start.callSid;
+          streamService.setStreamSid(streamSid);
+          streamService.setCallSid(callSid);
+          gptService.setCallSid(callSid);
+          ivrService.setCallSid(callSid);
+          console.log(`socket -> Starting Media Stream for ${streamSid}`);
+        }
+
+        if (twilioMessage["event"] === "media") {
+          const media = twilioMessage["media"];
+          const payload = media["payload"];
+          transcriptionService.send(payload);
+        }
+
+        if (twilioMessage["event"] === "stop") {
+          console.info("socket: received a twilio stop event.");
+          console.log(`socket -> Media stream ${streamSid} ended.`);
+          // TODO: Implement the logic for handling the "stop" event
+        }
       });
 
-      deepgramConnection.on(LiveTranscriptionEvents.Open, () => {
-        deepgramConnection.on(
-          LiveTranscriptionEvents.Transcript,
-          async (transcription) => {
-            const transcript = transcription.channel.alternatives[0].transcript;
-
-            if (transcript) {
-              transcriptCollection.push(transcript);
-            }
-            console.info({ transcript });
-            if (transcriptCollection.length < 1 || transcript) {
-              return;
-            }
-
-            const userInput = transcriptCollection.join("");
-            transcriptCollection = [];
-            console.info({ userInput });
-            await agent(openaiClient, userInput, enqueueAssistantMessage);
-          }
-        );
-
-        deepgramConnection.on(LiveTranscriptionEvents.Close, () => {
-          console.info("Deepgram Connection closed.");
-        });
-
-        ws.on("message", (data: $TSFixMe) => {
-          const twilioMessage = JSON.parse(data);
-
-          if (
-            twilioMessage["event"] === "connected" ||
-            twilioMessage["event"] === "start"
-          ) {
-            console.info("Received a Twilio Connected or Start Event");
-          }
-
-          if (twilioMessage["event"] === "media") {
-            const media = twilioMessage["media"];
-            const audio = Buffer.from(media["payload"], "base64");
-            deepgramConnection.send(audio);
-          }
-        });
-
-        ws.on("close", () => {
-          console.info("client has disconnected");
-          if (deepgramConnection) {
-            deepgramConnection.finish();
-          }
-        });
-
-        ws.on("error", (err) => {
-          const message = err?.message || "Something Went Wrong!!";
-          if (deepgramConnection) {
-            deepgramConnection.finish();
-          }
-          throw Error(message);
-        });
+      ws.on("close", () => {
+        console.info("socket: client has disconnected.");
+        // TODO: Implement any necessary cleanup or termination logic
       });
-    });
-    console.info(`Listening on port ${port}`);
-    server.listen(port);
-  } catch (err) {
-    console.error({ err });
-  }
-};
 
-const startProcessingAssistantMessages = async () => {
-  try {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const callSid = await redisClient.get(STORE_KEYS.CALL_SID);
-      if (callSid && assistantMessages.length > 0) {
-        const message = assistantMessages.shift();
-        if (!message || !message.content) {
-          console.info("Cannot Push Empty Message to Update Call");
+      ws.on("error", async (err) => {
+        console.info("socket: client has recieved error.");
+        const message = err?.message || "something went wrong!!";
+        console.error(`socket: ${message}`);
+        // TODO: Implement any necessary cleanup or termination logic
+      });
+
+      transcriptionService.on("utterance", async (text: string) => {
+        // This is a bit of a hack to filter out empty utterances
+        if (text?.length > 5) {
+          console.log(colorErr("Twilio -> Interruption, Clearing stream"));
+          console.log(colorErr(text));
+          ws.send(
+            JSON.stringify({
+              streamSid,
+              event: "clear",
+            }),
+          );
+        }
+      });
+
+      transcriptionService.on("transcription", async (text: string) => {
+        if (!text) {
           return;
         }
-        await updateInProgessCall(callSid, message);
-      } else {
-        await new Promise((resolve) =>
-          messageQueue.once("new_message", resolve)
+        console.log(colorSuccess(`transcription: ${text}`));
+        if (
+          ActiveCallConfig.getInstance().getCallConfig()
+            ?.isLastIvrMenuOptionUsed &&
+          !ActiveCallConfig.getInstance().getCallConfig()
+            ?.isIVRNavigationCompleted
+        ) {
+          isCallTransfered(text).then((isTransfered) => {
+            if (!isTransfered) return;
+            ActiveCallConfig.getInstance().setIVRNavigationCompleted();
+          });
+        }
+        if (
+          ActiveCallConfig.getInstance().getCallConfig()
+            ?.isIVRNavigationCompleted
+        ) {
+          console.log(
+            colorUpdate(
+              `Interaction ${interactionCount} – deepgram -> GPT: ${text}`,
+            ),
+          );
+          gptService.completion(text, interactionCount);
+          interactionCount += 1;
+        } else {
+          ivrService.handleResponse(text);
+        }
+        console.log(
+          colorUpdate(
+            `isIVRNavigationCompleted: ${
+              ActiveCallConfig.getInstance().getCallConfig()
+                ?.isIVRNavigationCompleted
+            }`,
+          ),
         );
-      }
-      if (!callSid) {
-        console.error("Call Sid is Missing.");
-      }
-    }
-  } catch (err) {
-    console.error({ err });
+      });
+
+      transcriptionService.on("transcriptionerror", () => {
+        streamService.endCall();
+      });
+
+      gptService.on(
+        "gptreply",
+        async (
+          gptReply: AssistantResponse,
+          partialResponseIndex,
+          icount: number,
+        ) => {
+          console.log(
+            colorInfo(
+              `Interaction ${icount}: gpt: GPT -> TTS: ${gptReply.content}`,
+            ),
+          );
+          console.log(
+            colorInfo(
+              `Interaction ${icount}: gpt: response-type:${gptReply.responseType}`,
+            ),
+          );
+          streamService.sendTwiml(gptReply, partialResponseIndex, icount);
+        },
+      );
+
+      gptService.on("gpterror", () => {
+        streamService.endCall();
+        deleteActiveCall();
+      });
+
+      ivrService.on("ivrreply", async (ivrReply: AssistantResponse) => {
+        console.log(colorInfo(`ivrservice: IVR -> TTS: ${ivrReply.content}`));
+        console.log(
+          colorInfo(`ivrservice: response-type:${ivrReply.responseType}`),
+        );
+        streamService.sendTwiml(ivrReply, -1, -1);
+      });
+
+      streamService.on(
+        "twimlsent",
+        (partialResponseIndex: number, icount: number) => {
+          console.log(
+            colorInfo(
+              `PartialResponseIndex:${partialResponseIndex} InteractionCount: ${icount}, twilio -> update has been sent`,
+            ),
+          );
+        },
+      );
+
+      streamService.on("callended", () => {
+        console.log(`twilio: call has ended`);
+        ws?.close?.();
+      });
+    });
+
+    wss.on("error", (err) => {
+      console.error(
+        colorErr(
+          `Message: ${err?.message} Cause: ${err?.cause} Name: ${err.name}`,
+        ),
+      );
+      deleteActiveCall();
+    });
+
+    console.info(`server: listening on port ${PORT}.`);
+    server.listen(PORT);
+  } catch (err: $TSFixMe) {
+    console.error(`server: ${err?.message || "Something went wrong!!"}`);
+    deleteActiveCall();
   }
 };
 
-connectDeepgram();
-connectTwilio();
 connectRedis();
 startServer();
-startProcessingAssistantMessages();

@@ -1,16 +1,12 @@
 import "./App.css";
-import {
-  FetchAndRenderCallStatus,
-  FetchAndRenderTranscription,
-  MakeCall,
-} from "./components";
+import { CallLog } from "./components/call-log";
+import { MakeCallForm } from "./components/make-call";
 
 function App() {
   return (
-    <main className="container mx-auto p-4 text-center grid lg:grid-cols-3 gap-4">
-      <MakeCall />
-      <FetchAndRenderTranscription />
-      <FetchAndRenderCallStatus />
+    <main className="min-h-screen w-full px-4 py-6 mx-auto  grid gap-4 lg:gap-10 md:grid-cols-2 ">
+      <MakeCallForm />
+      <CallLog />
     </main>
   );
 }

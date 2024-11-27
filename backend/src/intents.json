@@ -1,0 +1,191 @@
+{
+  "8664479717": [
+    {
+      "intent": "Provider Type",
+      "triggers": ["medical provider"],
+      "response": "2"
+    },
+    {
+      "intent": "Enter NPI",
+      "triggers": ["10 digit npi"],
+      "response": "1689625543"
+    },
+    {
+      "intent": "Verify NPI",
+      "triggers": ["1689625543 is this correct"],
+      "response": "1"
+    },
+    {
+      "intent": "Calling For",
+      "triggers": ["eligibility and benefits", "claim status"],
+      "response": "1"
+    },
+    {
+      "intent": "Enter MemberID",
+      "triggers": ["member identification"],
+      "response": "1609644681"
+    },
+    {
+      "intent": "Verify MemberID",
+      "triggers": ["entered 16 0964-4681", "entered 16096 44681"],
+      "response": "1"
+    }
+  ],
+  "8776140484": [
+    {
+      "intent": "Reason for your Call",
+      "response": "credentialing",
+      "triggers": ["reason for your call"]
+    },
+    {
+      "intent": "Confirm Reason for Call",
+      "response": "credentialing",
+      "triggers": ["calling about credentialing"]
+    },
+    {
+      "intent": "Calling For",
+      "response": "credentialing",
+      "triggers": ["say credentialing"]
+    }
+  ],
+  "8009262273": [
+    [
+      {
+        "intent": "IDK",
+        "triggers": [
+          "tell me who you're calling as say a customer or health care professional",
+          "tell me who you're calling as",
+          "say a customer or health care professional"
+        ],
+        "response": "health care professional"
+      },
+      {
+        "intent": "IDK",
+        "triggers": [
+          "or for things like application status",
+          "or for things like application status and contract questions say provider resources"
+        ],
+        "response": "provider resources"
+      },
+      {
+        "intent": "IDK",
+        "triggers": [
+          "you can say provider application status",
+          "please say application status or press 1",
+          "for application status press 1"
+        ],
+        "response": "application status"
+      }
+    ]
+  ],
+  "8002331468": [
+    {
+      "intent": "Enter NPI",
+      "triggers": ["npi number"],
+      "response": "1154511376"
+    },
+    {
+      "intent": "Enter Tax ID",
+      "triggers": ["tax id"],
+      "response": "5725"
+    },
+    {
+      "intent": "Calling For",
+      "triggers": ["eligibility"],
+      "response": "eligibility"
+    },
+    {
+      "intent": "Member ID NA",
+      "triggers": ["cant find it"],
+      "response": "2"
+    }
+  ],
+  "8004880134": [
+    {
+      "intent": "Provider Type",
+      "triggers": ["health care provider"],
+      "response": "health care provider"
+    },
+    {
+      "intent": "Calling From",
+      "triggers": ["behavioral health"],
+      "response": "3"
+    },
+    {
+      "intent": "Calling About",
+      "response": "2",
+      "triggers": ["eligibility"]
+    },
+    {
+      "intent": "Enter NPI",
+      "response": "1134672009",
+      "triggers": ["providers npi"]
+    },
+    {
+      "intent": "Enter CareSource member ID",
+      "response": "1770282220",
+      "triggers": ["caresource member id"]
+    },
+    {
+      "intent": "Enter DOB",
+      "response": "August 5, 1998",
+      "triggers": ["date of birth"]
+    }
+  ],
+  "8006262741": [
+    {
+      "intent": "Calling For",
+      "triggers": ["how may i help"],
+      "response": "application status"
+    },
+    {
+      "intent": "TAX ID",
+      "triggers": ["tax id"],
+      "response": "eight seven four one three four eight two two"
+    },
+    {
+      "intent": "No claims",
+      "triggers": ["was that claims"],
+      "response": "Yes"
+    },
+    {
+      "intent": "NPI",
+      "triggers": ["your npi", "national provider id"],
+      "response": "eight seven two nine five five three three two"
+    },
+    {
+      "intent": "say or enter the members id",
+      "triggers": ["say or enter the members id"],
+      "response": "one nine five two eight three six six eight six"
+    }
+  ],
+  "8888011660": [
+    {
+      "intent": "Provider Verify",
+      "triggers": ["if you are a provider"],
+      "response": "1"
+    },
+    {
+      "intent": "Provider Info",
+      "triggers": ["for provider account information"],
+      "response": "4"
+    }
+  ],
+  "8665222736": [
+    {
+      "intent": "Reason for Call",
+      "triggers": ["reason for your call"],
+      "response": "claims"
+    },
+    {
+      "intent": "Enter TAX ID",
+      "triggers": ["tax", "tax id", "tax identification"],
+      "response": "eight four four six five nine seven six nine"
+    },
+    {
+      "intent": "Verify TAX ID",
+      "triggers": ["you entered 844659769", "you entered 8446 59769"],
+      "response": "Yes"
+    }
+  ]
+}

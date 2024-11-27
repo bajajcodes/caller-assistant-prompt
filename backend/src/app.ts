@@ -1,123 +1,205 @@
+import { generateApplicationStatusJson } from "@scripts/applicationstatus";
+import { getCallStatus } from "@scripts/call-status";
+import { hangupCall } from "@scripts/hangup-call";
+import { makeOutboundCall } from "@scripts/outbound-call";
+import { triggerWebhook } from "@scripts/triggerwebhook";
+import { ActiveCallConfig } from "@service/activecall-service";
+import { CallLogKeys, CallLogService } from "@service/calllog-service";
+import { CALL_TERMINATED_STATUS } from "@service/stream-service";
+import { CallData, isValidCallData, updateIVRMenus } from "@utils/api";
+import { isValidCallSid, scheduleCallStatusCheck } from "@utils/call";
+import { colorErr } from "@utils/colorCli";
 import cors from "cors";
 import type { Express } from "express";
 import express from "express";
-import { getChatMessages, intializeChatMessages } from "service/openai";
-import { redisClient } from "service/redis";
-import { twilioClient } from "service/twilio";
-import twillio from "twilio";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { $TSFixMe } from "types/common";
-import { STORE_KEYS } from "types/redis";
-import { TWILIO_FROM_NUMBER } from "utils/config";
 
-const VoiceResponse = twillio.twiml.VoiceResponse;
 const app: Express = express();
 
 app.use(cors());
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(express.static("build"));
+app.use(express.static("dist"));
 
 app.use(async (req, _, next) => {
-  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
-  const wsProtocol = protocol === "https" ? "wss" : "ws";
+  // const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  // const wsProtocol = protocol === "https" ? "wss" : "ws";
+  const protocol = "https";
+  const wsProtocol = "wss";
   req.headers.protocol = protocol;
   req.headers.wsProtocol = wsProtocol;
-  await redisClient.set(STORE_KEYS.HOST, req.headers.host!);
   next();
 });
 
-app.get("/", (_, res) => res.send("Hello World 👋, from Caller Assistant!!"));
-
-app.get("/callstatus", async (_, res) => {
-  const callStatus = await redisClient.get(STORE_KEYS.CALL_STATUS);
-  return res.json({ callStatus });
+app.get("/", (_, res) => {
+  res.send("Hello World 👋, from Caller Assistant!!");
 });
 
-app.get("/applicationstatus", async (_, res) => {
-  const applicationStatus =
-    (await redisClient.get(STORE_KEYS.APPLICATION_STATUS)) || "NA";
-  return res.json({ applicationStatus });
+app.get("/calllog/:callsid", async (req, res) => {
+  const sid = req.params.callsid;
+  if (!sid || !isValidCallSid(sid)) {
+    return res.status(400).json({ message: "call sid is missing or invalid." });
+  }
+  const callLog = await CallLogService.read(sid);
+  if (!callLog) {
+    return res
+      .status(404)
+      .json({ message: `Call Details not found for CallSid: ${sid}.` });
+  }
+  return res.json(callLog);
 });
 
-app.get("/transcription", (_, res) => {
-  const chatMessages = getChatMessages();
-  const transcription = chatMessages.filter(
-    (message) => message.role === "user" || message.role === "assistant"
-  );
-  res.json({ transcription });
+app.get("/applicationstatusjson/:callsid", async (req, res) => {
+  const sid = req.params.callsid;
+  if (!sid || !isValidCallSid(sid)) {
+    return res.status(400).json({ message: "call sid is missing or invalid." });
+  }
+  const status = await getCallStatus(sid);
+  if (status && !CALL_TERMINATED_STATUS.includes(status)) {
+    return res.status(400).json({
+      message: "Cannot get Application Status Json, call is not terminated.",
+    });
+  }
+  let applicationStatus = (await CallLogService.get(
+    sid,
+    CallLogKeys.APPLICATION_STATUS
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  )) as Record<string, any>;
+  if (Object.keys(applicationStatus).length) {
+    return res.json(applicationStatus);
+  }
+  applicationStatus = await generateApplicationStatusJson(sid);
+  if (!applicationStatus) {
+    return res.status(400).json({ message: "Unable to find Transcription." });
+  }
+  CallLogService.create(sid, CallLogKeys.APPLICATION_STATUS, applicationStatus);
+  return res.json(applicationStatus);
 });
 
-app.post("/makeacall", async (req, res) => {
+app.get("/triggerwebhook/:callsid", async (req, res) => {
+  const sid = req.params.callsid;
+  if (!sid || !isValidCallSid(sid)) {
+    return res.status(400).json({ message: "call sid is missing or invalid." });
+  }
+  await triggerWebhook(sid);
+  return res.json();
+});
+
+app.post("/makeoutboundcall", async (req, res) => {
   try {
-    const twilioCallToNumber = req.body.twilioCallToNumber;
-    const providerData = req.body.providerData;
-    if (!twilioCallToNumber || !providerData) {
-      throw Error("Call To Number or Provider Data is Missing");
+    const sid = ActiveCallConfig.getInstance().getCallConfig()?.callSid;
+    const status = sid ? await getCallStatus(sid) : null;
+    if (sid && status && !CALL_TERMINATED_STATUS.includes(status)) {
+      return res.status(400).json({
+        message:
+          "Cannot initiate another call when a previous call is in progress.",
+      });
     }
-    if (!TWILIO_FROM_NUMBER) {
-      throw Error("Call From Number is Missing");
+    //TODO: find solution for for newlines and ' characters formatting
+    let providerDataString = "",
+      ivrMenuString = "";
+
+    if (typeof req.body.providerData === "string") {
+      providerDataString = (req.body.providerData as string)
+        .replaceAll("\\n", "")
+        .replaceAll("\\n'", "");
     }
-    const response = new VoiceResponse();
-    const connect = response.connect();
-    response.say("");
-    connect.stream({
-      url: `${req.headers.wsProtocol}://${req.headers.host}`,
-      track: "inbound_track",
+    if (typeof req.body.ivrMenu === "string") {
+      ivrMenuString = (req.body.ivrMenu as string)
+        .replaceAll("\\n", "")
+        .replaceAll("\\n'", "");
+    }
+
+    const plainProviderData = providerDataString
+      ? JSON.parse(providerDataString)
+      : req.body.providerData;
+    const plainIvrMenu = ivrMenuString
+      ? JSON.parse(ivrMenuString)
+      : req.body.ivrMenu;
+
+    const callData = {
+      providerData: plainProviderData,
+      ivrMenu: plainIvrMenu,
+    } as CallData;
+    const { isValid, message } = isValidCallData(callData);
+    if (!isValid) {
+      return res.status(400).json({ message, callSid: null });
+    }
+
+    const call = await makeOutboundCall({
+      callTo: callData.providerData.phoneNumber,
+      isHTTPS: req.headers.protocol === "https",
     });
-    response.pause({
-      length: 120,
-    });
-    const twiml = response.toString();
-    const call = await twilioClient.calls.create({
-      twiml,
-      to: twilioCallToNumber,
-      from: TWILIO_FROM_NUMBER,
-      record: true,
-      statusCallback: `${req.headers.protocol}://${req.headers.host}/callupdate`,
-      statusCallbackMethod: "POST",
-      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
-    });
-    // await redisClient.hSet(call.sid, {
-    //   providerData,
-    //   callSid: call.sid,
-    //   callStatus: "",
-    //   applicationStatus: "",
-    // });
-    redisClient.set(STORE_KEYS.CALL_SID, call.sid);
-    redisClient.set(STORE_KEYS.PROVIDER_DATA, providerData);
-    redisClient.set(STORE_KEYS.APPLICATION_STATUS, "NA");
-    redisClient.set(STORE_KEYS.CALL_STATUS, "");
-    intializeChatMessages(providerData);
-    console.info(`Call initiated with SID: ${call.sid}`);
-    res.json({
-      message: `Call initiated with SID: ${call.sid}`,
+
+    if (!call.sid) {
+      return res
+        .status(400)
+        .json({ message: "Failed to initiate the call.", callSid: null });
+    }
+    scheduleCallStatusCheck(call.sid);
+
+    const { transformedIvrMenu, updatedIvrMenu } = updateIVRMenus(callData);
+    ActiveCallConfig.getInstance().setCallConfig({
       callSid: call.sid,
-      callInitiated: true,
+      ivrMenu: updatedIvrMenu,
+      providerData: callData.providerData,
     });
-  } catch (err: $TSFixMe) {
-    console.error({ err });
+    //TODO: refactor to one function call
+    CallLogService.create(
+      call.sid,
+      CallLogKeys.PROVIDED_IVR_MENU,
+      callData.ivrMenu
+    );
+    CallLogService.create(
+      call.sid,
+      CallLogKeys.TRANSFORMED_IVR_MENU,
+      transformedIvrMenu
+    );
+    CallLogService.create(
+      call.sid,
+      CallLogKeys.INTERNAL_USED_IVR_MENU,
+      updatedIvrMenu
+    );
+    res.json({
+      message: `Call initiated`,
+      callSid: call.sid,
+      updatedIvrMenu: transformedIvrMenu,
+    });
+  } catch (err: unknown) {
+    console.error(colorErr(err));
     res.status(400).json({
-      message: "Failed to initiate call",
-      callInitiated: false,
+      message: `${(err as Error)?.message || "failed to initiate call"}.`,
+      callSid: null,
     });
   }
 });
 
-app.post("/callupdate", async (req, res) => {
+app.post("/callstatusupdate", async (req, res) => {
   console.info(
     "Call Status Update:",
     req.body.CallStatus,
     "for Call SID:",
     req.body.CallSid
   );
-  // const call = await redisClient.hGetAll(req.body.callSid);
-  // await redisClient.hSet(call.callSid, {
-  //   ...call,
-  //   callStatus: req.body.CallStatus,
-  // });
-  redisClient.set(STORE_KEYS.CALL_STATUS, req.body.CallStatus);
+  CallLogService.create(
+    req.body.CallSid,
+    CallLogKeys.CALL_STATUS,
+    req.body.CallStatus
+  );
+  if (CALL_TERMINATED_STATUS.includes(req.body.CallStatus)) {
+    triggerWebhook(req.body.CallSid);
+  }
   return res.status(200).send();
+});
+
+app.post("/hangupcall", async (req, res) => {
+  const callSid = req.body.callSid;
+  try {
+    await hangupCall(callSid);
+    ActiveCallConfig.getInstance().deleteCallConfig();
+    return res.status(200).send();
+  } catch (err) {
+    return res.status(400).send();
+  }
 });
 
 export default app;
